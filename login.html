@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>NEOPOCKET AI - Login</title>
   <link rel="stylesheet" href="style.css"/>
+  <script src="i18n.js"></script>
 </head>
 
 <body class="login-body">
@@ -14,37 +15,41 @@
   <div class="login-container">
     <div class="login-box">
 
+      <div class="login-lang-wrap">
+        <div id="login-lang-slot"></div>
+      </div>
+
       <div class="login-header">
         <div class="logo">N</div>
-        <h1>NEOPOCKET AI</h1>
-        <p>Smart Finance Assistant</p>
+        <h1 data-i18n="login_app_name">NEOPOCKET AI</h1>
+        <p data-i18n="login_tagline">Smart Finance Assistant</p>
       </div>
 
       <!-- Tab switcher -->
       <div class="auth-tabs">
-        <button class="auth-tab active" id="tab-login" onclick="switchTab('login')">Login</button>
-        <button class="auth-tab" id="tab-signup" onclick="switchTab('signup')">Sign Up</button>
+        <button class="auth-tab active" id="tab-login" onclick="switchTab('login')" data-i18n="tab_login">Login</button>
+        <button class="auth-tab" id="tab-signup" onclick="switchTab('signup')" data-i18n="tab_signup">Sign Up</button>
       </div>
 
       <!-- LOGIN FORM -->
       <form id="loginForm" class="auth-form" onsubmit="handleLogin(event)">
 
         <div class="input-group">
-          <label>Email</label>
-          <input type="email" id="login-email" placeholder="Enter your email" required />
+          <label data-i18n="email_label">Email</label>
+          <input type="email" id="login-email" placeholder="Enter your email" data-i18n-placeholder="email_ph" required />
         </div>
 
         <div class="input-group">
-          <label>Password</label>
-          <input type="password" id="login-password" placeholder="Enter your password" required />
+          <label data-i18n="password_label">Password</label>
+          <input type="password" id="login-password" placeholder="Enter your password" data-i18n-placeholder="password_ph" required />
         </div>
 
         <div id="login-error" class="auth-error" style="display:none;"></div>
 
-        <button type="submit" class="login-btn">Login</button>
+        <button type="submit" class="login-btn" data-i18n="login_btn">Login</button>
 
         <p class="signup-text">
-          No account? <a href="#" onclick="switchTab('signup'); return false;">Sign up free</a>
+          <span data-i18n="no_account">No account?</span> <a href="#" onclick="switchTab('signup'); return false;" data-i18n="signup_free">Sign up free</a>
         </p>
 
       </form>
@@ -53,32 +58,32 @@
       <form id="signupForm" class="auth-form" style="display:none;" onsubmit="handleSignup(event)">
 
         <div class="input-group">
-          <label>Full Name</label>
-          <input type="text" id="signup-name" placeholder="Enter your full name" required />
+          <label data-i18n="full_name_label">Full Name</label>
+          <input type="text" id="signup-name" placeholder="Enter your full name" data-i18n-placeholder="full_name_ph" required />
         </div>
 
         <div class="input-group">
-          <label>Email</label>
-          <input type="email" id="signup-email" placeholder="Enter your email" required />
+          <label data-i18n="email_label">Email</label>
+          <input type="email" id="signup-email" placeholder="Enter your email" data-i18n-placeholder="email_ph" required />
         </div>
 
         <div class="input-group">
-          <label>Password</label>
-          <input type="password" id="signup-password" placeholder="Create a password (min 6 chars)" required minlength="6"/>
+          <label data-i18n="password_label">Password</label>
+          <input type="password" id="signup-password" placeholder="Create a password (min 6 chars)" data-i18n-placeholder="signup_password_ph" required minlength="6"/>
         </div>
 
         <div class="input-group">
-          <label>Confirm Password</label>
-          <input type="password" id="signup-confirm" placeholder="Repeat your password" required />
+          <label data-i18n="confirm_password_label">Confirm Password</label>
+          <input type="password" id="signup-confirm" placeholder="Repeat your password" data-i18n-placeholder="confirm_password_ph" required />
         </div>
 
         <div id="signup-error" class="auth-error" style="display:none;"></div>
         <div id="signup-success" class="auth-success" style="display:none;"></div>
 
-        <button type="submit" class="login-btn">Create Account</button>
+        <button type="submit" class="login-btn" data-i18n="create_account_btn">Create Account</button>
 
         <p class="signup-text">
-          Already have an account? <a href="#" onclick="switchTab('login'); return false;">Login</a>
+          <span data-i18n="already_account">Already have an account?</span> <a href="#" onclick="switchTab('login'); return false;" data-i18n="tab_login">Login</a>
         </p>
 
       </form>
@@ -196,7 +201,7 @@
 
       errEl.style.display = 'none';
       if (!email || !pass) {
-        errEl.textContent = 'Please enter both email and password.';
+        errEl.textContent = t('err_both_fields');
         errEl.style.display = 'block';
         return;
       }
@@ -223,19 +228,19 @@
       sucEl.style.display = 'none';
 
       if (!name || !email || !pass) {
-        errEl.textContent = 'All fields are required.';
+        errEl.textContent = t('err_all_fields');
         errEl.style.display = 'block';
         return;
       }
       if (pass !== confirm) {
-        errEl.textContent = '❌ Passwords do not match.';
+        errEl.textContent = t('err_password_mismatch');
         errEl.style.display = 'block';
         return;
       }
 
       try {
         await apiRequest('signup', { name, email, password: pass });
-        sucEl.textContent = '✅ Account created! Redirecting...';
+        sucEl.textContent = t('success_account_created');
         sucEl.style.display = 'block';
         setTimeout(() => { window.location.href = 'index.html'; }, 800);
       } catch (err) {

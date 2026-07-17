@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="i18n.js"></script>
 </head>
 <body>
 
@@ -23,33 +24,38 @@
     <nav class="sidebar-nav">
       <button class="nav-btn active" data-page="dashboard">
         <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-        Dashboard
+        <span data-i18n="nav_dashboard">Dashboard</span>
       </button>
       <button class="nav-btn" data-page="add">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-        Add Expense
+        <span data-i18n="nav_add">Add Expense</span>
       </button>
       <button class="nav-btn" data-page="analytics">
         <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-        Analytics
+        <span data-i18n="nav_analytics">Analytics</span>
       </button>
       <button class="nav-btn" data-page="ai">
         <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 8v4l3 3"/></svg>
-        AI Advisor
+        <span data-i18n="nav_ai">AI Advisor</span>
       </button>
       <button class="nav-btn" data-page="forecast">
         <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-        Forecast
+        <span data-i18n="nav_forecast">Forecast</span>
       </button>
     </nav>
+
+    <div class="sidebar-settings" style="padding:0 20px 12px;">
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em;" data-i18n="settings_language">Language</div>
+      <div id="lang-switcher-slot"></div>
+    </div>
 
     <div class="sidebar-user">
       <div class="user-avatar">YT</div>
       <div style="flex:1;">
         <div class="user-name">Yamada Taro</div>
-        <div class="user-plan">Pro Member</div>
+        <div class="user-plan" data-i18n="sidebar_plan">Pro Member</div>
       </div>
-      <button onclick="handleLogout()" title="Logout" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:18px;padding:4px;" title="Logout">⏻</button>
+      <button onclick="handleLogout()" data-i18n-title="logout_title" title="Logout" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:18px;padding:4px;">⏻</button>
     </div>
   </aside>
 

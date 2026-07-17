@@ -61,8 +61,24 @@ const CAT_MAP = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
 ───────────────────────────────────────────────────── */
 
 let expenses  = [];
-let income    = DEFAULT_INCOME;
+let incomeByMonth = {};    // { 'YYYY-MM': amount } — each month's income is set independently
 let chartInstances = {};   // track Chart.js instances
+
+/* ── AI Advisor state ── */
+let currency      = 'JPY';                 // active display currency for the AI Advisor
+let budgetLimits  = {};                    // { category: limitAmountJPY }
+let savingsGoals  = [];                    // [{ id, name, target, current }]
+
+/* ── Month-picker state (Dashboard / Analytics) ── */
+let dashboardSelectedMonth = null;         // 'YYYY-MM', set on first renderDashboard() call
+let analyticsSelectedMonth = null;         // 'YYYY-MM', set on first renderAnalytics() call
+
+const CURRENCY_OPTIONS = [
+  { code: 'JPY', label: '¥ JPY' }, { code: 'USD', label: '$ USD' },
+  { code: 'EUR', label: '€ EUR' }, { code: 'GBP', label: '£ GBP' },
+  { code: 'NPR', label: 'रु NPR' }, { code: 'INR', label: '₹ INR' },
+  { code: 'CNY', label: '¥ CNY' },
+];
 
 /* ─────────────────────────────────────────────────────
    3. SERVER DATA
@@ -72,17 +88,20 @@ async function loadData() {
   const res = await apiRequest('get_data');
   currentUser = res.user || currentUser;
   expenses = Array.isArray(res.expenses) ? res.expenses : [];
-  income = Number(res.income) || DEFAULT_INCOME;
+  incomeByMonth = res.incomeByMonth && typeof res.incomeByMonth === 'object' ? res.incomeByMonth : {};
+  currency = res.currency || 'JPY';
+  budgetLimits = res.budgetLimits && typeof res.budgetLimits === 'object' ? res.budgetLimits : {};
+  savingsGoals = Array.isArray(res.savingsGoals) ? res.savingsGoals : [];
   updateSidebarUser();
 }
 
 async function saveData() {
   try {
-    const res = await apiRequest('save_data', { expenses, income });
+    const res = await apiRequest('save_data', { expenses, incomeByMonth, currency, budgetLimits, savingsGoals });
     if (!res.success) throw new Error(res.error || 'Save failed');
     return true;
   } catch (e) {
-    showToast('Failed to save data to server', true);
+    showToast(t('toast_save_failed'), true);
     console.error(e);
     return false;
   }
@@ -148,8 +167,66 @@ function prevMonthExpenses() {
   });
 }
 
+/* ── Generic "YYYY-MM" month-key helpers, used by the Dashboard and
+   Analytics month pickers so either page can browse any past month,
+   not just the current one. ── */
+function monthKeyOf(y, mZeroBased) {
+  return `${y}-${String(mZeroBased + 1).padStart(2, '0')}`;
+}
+
+function expensesForMonthKey(key) {
+  const [y, m] = key.split('-').map(Number);
+  return expenses.filter(e => {
+    const d = new Date(e.date);
+    return d.getFullYear() === y && d.getMonth() === (m - 1);
+  });
+}
+
+// Each month's income is independent: a month with no explicit entry falls
+// back to DEFAULT_INCOME rather than inheriting a neighboring month's value,
+// so setting this month's income never rewrites the past or the future.
+function incomeForMonth(key) {
+  return incomeByMonth[key] ?? DEFAULT_INCOME;
+}
+
+function prevMonthKeyOf(key) {
+  const [y, m] = key.split('-').map(Number);
+  const d = new Date(y, m - 2, 1); // m is 1-based, so m-2 = one month before
+  return monthKeyOf(d.getFullYear(), d.getMonth());
+}
+
+function monthKeyLabel(key) {
+  const [y, m] = key.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString(localeCode(), { month: 'long', year: 'numeric' });
+}
+
+// Month options for the Dashboard / Analytics pickers: the last 12 months
+// plus any older month that actually has recorded expenses, newest first.
+function monthPickerOptions() {
+  const keys = new Set();
+  const now = new Date();
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    keys.add(monthKeyOf(d.getFullYear(), d.getMonth()));
+  }
+  expenses.forEach(e => {
+    const d = new Date(e.date);
+    if (!isNaN(d)) keys.add(monthKeyOf(d.getFullYear(), d.getMonth()));
+  });
+  return [...keys].sort().reverse().map(k => ({ value: k, label: monthKeyLabel(k) }));
+}
+
 function totalSpent(list) {
   return list.reduce((s, e) => s + e.amount, 0);
+}
+
+// All-time net savings: total income ever recorded (across every month the
+// user has set an income for) minus every expense ever logged — i.e. the
+// full running total since the person started using the app, not just the
+// currently viewed month.
+function allTimeNetSavings() {
+  const totalIncomeAllTime = Object.values(incomeByMonth).reduce((s, v) => s + (Number(v) || 0), 0);
+  return totalIncomeAllTime - totalSpent(expenses);
 }
 
 function groupByCategory(list) {
@@ -180,18 +257,23 @@ function scoreColor(s) {
 }
 
 function scoreLabel(s) {
-  if (s >= 80) return 'Excellent';
-  if (s >= 65) return 'Good';
-  if (s >= 50) return 'Fair';
-  return 'Needs Work';
+  if (s >= 80) return t('score_excellent');
+  if (s >= 65) return t('score_good_label');
+  if (s >= 50) return t('score_fair');
+  return t('score_needs_work');
 }
 
 function formatYen(n) {
   return '¥' + Math.round(n).toLocaleString();
 }
 
+const LOCALE_MAP = { en: 'en-GB', ja: 'ja-JP', ne: 'ne-NP', hi: 'hi-IN', es: 'es-ES', zh: 'zh-CN' };
+function localeCode() {
+  return LOCALE_MAP[typeof currentLang !== 'undefined' ? currentLang : 'en'] || 'en-GB';
+}
+
 function formatDate(str) {
-  return new Date(str).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  return new Date(str).toLocaleDateString(localeCode(), { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 function getLocalTimestamp() {
@@ -210,8 +292,23 @@ function formatTime(timeStr) {
   return `${match[1]}:${match[2]}`;
 }
 
+// Sort key for ordering transactions newest-first. Using `date` alone ties
+// every transaction from the same day together, and Array.sort's stable
+// tie-breaking then falls back to insertion order — so a transaction just
+// added today (appended to the end of the array) sorts *behind* every
+// other transaction already logged today, and can silently fall off a
+// sliced "recent 5" list. Falling back through time, then date, fixes that.
+function txSortKey(e) {
+  if (e.time) {
+    const d = new Date(String(e.time).replace(' ', 'T'));
+    if (!isNaN(d)) return d.getTime();
+  }
+  const d = new Date(e.date);
+  return isNaN(d) ? 0 : d.getTime();
+}
+
 function currentMonthLabel() {
-  return new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  return new Date().toLocaleDateString(localeCode(), { month: 'long', year: 'numeric' });
 }
 
 /* ─────────────────────────────────────────────────────
@@ -261,15 +358,15 @@ function generateAdvice(curList, inc) {
     advice.push({
       type: 'danger',
       icon: '🍔',
-      title: 'Food spending too high',
-      text: `あなたのFood支出は今月の合計の ${foodPct}% を占めています。理想は30%以下です。自炊を増やすことで月 ¥${Math.round(catMap['food'] * 0.3).toLocaleString()} 節約できる可能性があります。`
+      title: t('adv_food_high_title'),
+      text: t('adv_food_high_text', { pct: foodPct, amt: Math.round(catMap['food'] * 0.3).toLocaleString() })
     });
   } else if (foodPct > 30) {
     advice.push({
       type: 'warning',
       icon: '🍱',
-      title: 'Food budget watch',
-      text: `Food支出が ${foodPct}% です。少し高めですが、コンビニ利用を週2回減らすと月 ¥3,000〜5,000 の節約につながります。`
+      title: t('adv_food_watch_title'),
+      text: t('adv_food_watch_text', { pct: foodPct })
     });
   }
 
@@ -278,22 +375,26 @@ function generateAdvice(curList, inc) {
     advice.push({
       type: 'danger',
       icon: '💸',
-      title: 'Very low savings rate',
-      text: `今月の貯金率は ${savingsPct}% です。財務専門家は最低20%を推奨しています。大きな出費を見直し、サブスクを整理することをお勧めします。`
+      title: t('adv_savings_low_title'),
+      text: t('adv_savings_low_text', { pct: savingsPct })
     });
   } else if (savingsPct < 20) {
     advice.push({
       type: 'warning',
       icon: '🪙',
-      title: 'Savings below target',
-      text: `貯金率 ${savingsPct}% — 目標の20%を下回っています。月 ¥${Math.round(inc * 0.05).toLocaleString()} を自動貯金に設定すると、年間で ¥${Math.round(inc * 0.05 * 12).toLocaleString()} 貯まります。`
+      title: t('adv_savings_below_title'),
+      text: t('adv_savings_below_text', {
+        pct: savingsPct,
+        amt: Math.round(inc * 0.05).toLocaleString(),
+        amt2: Math.round(inc * 0.05 * 12).toLocaleString()
+      })
     });
   } else {
     advice.push({
       type: 'success',
       icon: '🏆',
-      title: 'Great savings rate!',
-      text: `素晴らしい！貯金率 ${savingsPct}% は優秀です。このペースを維持すると、6ヶ月で ¥${Math.round(savings * 6).toLocaleString()} の貯金になります。`
+      title: t('adv_savings_great_title'),
+      text: t('adv_savings_great_text', { pct: savingsPct, amt: Math.round(savings * 6).toLocaleString() })
     });
   }
 
@@ -303,8 +404,8 @@ function generateAdvice(curList, inc) {
     advice.push({
       type: 'warning',
       icon: '🎮',
-      title: 'Entertainment spending high',
-      text: `Entertainment費が ${entPct}% (${formatYen(catMap['entertain'])}) です。サブスクリプションを年払いに切り替えると最大20%の割引が受けられます。`
+      title: t('adv_entertain_title'),
+      text: t('adv_entertain_text', { pct: entPct, amt: formatYen(catMap['entertain']) })
     });
   }
 
@@ -314,8 +415,8 @@ function generateAdvice(curList, inc) {
     advice.push({
       type: 'warning',
       icon: '🛍️',
-      title: 'Shopping over budget',
-      text: `Shopping支出が ${formatYen(catMap['shopping'])} (${shopPct}%) です。購入前に24時間待つルールを試すと衝動買いが減ります。`
+      title: t('adv_shopping_title'),
+      text: t('adv_shopping_text', { amt: formatYen(catMap['shopping']), pct: shopPct })
     });
   }
 
@@ -324,23 +425,18 @@ function generateAdvice(curList, inc) {
     advice.push({
       type: 'info',
       icon: '⚡',
-      title: 'Utility cost tip',
-      text: `Bills費 ${formatYen(catMap['bills'])} — 電力会社の切り替えや省エネ設定で月 ¥1,000〜3,000 削減できる可能性があります。`
+      title: t('adv_bills_title'),
+      text: t('adv_bills_text', { amt: formatYen(catMap['bills']) })
     });
   }
 
   /* Rule 6: General tip (always) */
-  const tips = [
-    '💡 収入の3〜6ヶ月分の緊急資金を確保することを目標にしましょう。',
-    '📊 毎月の支出を3つの柱「必需品50%・ゴール20%・生活費30%」で管理するのがおすすめです。',
-    '🔄 固定費（家賃・通信費・保険）は年1回見直すことで大幅な節約になります。',
-    '📱 家計アプリでの定期的な支出レビューが資産形成の第一歩です。',
-  ];
+  const tipKeys = ['tip_0', 'tip_1', 'tip_2', 'tip_3'];
   advice.push({
     type: 'info',
     icon: '🤖',
-    title: 'AI Financial tip',
-    text: tips[new Date().getDate() % tips.length]
+    title: t('adv_general_tip_title'),
+    text: t(tipKeys[new Date().getDate() % tipKeys.length])
   });
 
   return advice;
@@ -359,7 +455,7 @@ function calcForecast(curList, inc) {
 
   for (let i = 1; i <= 3; i++) {
     const d     = new Date(now.getFullYear(), now.getMonth() + i, 1);
-    const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const label = d.toLocaleDateString(localeCode(), { month: 'long', year: 'numeric' });
 
     // Simple trend: spending grows 2% per month, capped
     const estimatedSpend  = Math.round(avgSpend * Math.pow(1.02, i));
@@ -377,12 +473,16 @@ function calcForecast(curList, inc) {
 
 /* ── 9a. DASHBOARD ── */
 function renderDashboard() {
-  const cur  = currentMonthExpenses();
-  const prev = prevMonthExpenses();
+  if (!dashboardSelectedMonth) dashboardSelectedMonth = currentYYYYMM();
+
+  const cur  = expensesForMonthKey(dashboardSelectedMonth);
+  const prev = expensesForMonthKey(prevMonthKeyOf(dashboardSelectedMonth));
+  const monthIncome = incomeForMonth(dashboardSelectedMonth);
   const spent     = totalSpent(cur);
   const prevSpent = totalSpent(prev);
-  const savings   = Math.max(0, income - spent);
-  const score     = calcScore(cur, income);
+  const savings   = Math.max(0, monthIncome - spent);
+  const allTimeNet = allTimeNetSavings();
+  const score     = calcScore(cur, monthIncome);
   const sColor    = scoreColor(score);
   const sLabel    = scoreLabel(score);
   const spentDiff = spent - prevSpent;
@@ -390,56 +490,71 @@ function renderDashboard() {
   const circumference = 2 * Math.PI * 44;
   const dash = (score / 100) * circumference;
 
-  // Recent 5 transactions
-  const recent = [...expenses]
-    .sort((a, b) => new Date(b.date) - new Date(a.date))
+  // Recent 5 transactions for the selected month
+  const recent = [...cur]
+    .sort((a, b) => txSortKey(b) - txSortKey(a))
     .slice(0, 5);
 
   const txRows = recent.length
     ? recent.map(e => txRowHTML(e)).join('')
-    : `<div class="empty-state"><div class="icon">💳</div><p>No transactions yet</p></div>`;
+    : `<div class="empty-state"><div class="icon">💳</div><p>${t('empty_tx')}</p></div>`;
 
   return `
     <div class="page-header">
       <div>
-        <div class="page-title">Dashboard</div>
-        <div class="page-subtitle">Welcome back, ${currentUser.name} 👋</div>
+        <div class="page-title">${t('dash_title')}</div>
+        <div class="page-subtitle">${t('dash_welcome', { name: currentUser.name })}</div>
       </div>
-      <div class="date-badge">${currentMonthLabel()}</div>
+      <select class="month-select-badge" id="dashboard-month-select" onchange="dashboardSelectedMonth=this.value; navigateTo('dashboard')">
+        ${monthPickerOptions().map(o => `<option value="${o.value}" ${o.value === dashboardSelectedMonth ? 'selected' : ''}>${o.label}</option>`).join('')}
+      </select>
     </div>
 
     <div class="metric-grid">
       <div class="metric-card" style="--grad: linear-gradient(135deg,#667eea,#764ba2);">
         <span class="metric-icon">💰</span>
-        <div class="metric-label">Monthly Income</div>
-        <div class="metric-value">${formatYen(income)}</div>
-        <div class="metric-sub metric-neutral">Base salary</div>
+        <div class="metric-label">${t('metric_income')}</div>
+        <div class="metric-value">${formatYen(monthIncome)}</div>
+        <div class="metric-sub metric-neutral">${t('metric_income_sub')}</div>
       </div>
       <div class="metric-card" style="--grad: linear-gradient(135deg,#f093fb,#f5576c);">
         <span class="metric-icon">💸</span>
-        <div class="metric-label">Total Spent</div>
+        <div class="metric-label">${t('metric_spent')}</div>
         <div class="metric-value">${formatYen(spent)}</div>
         <div class="metric-sub ${spentDiff >= 0 ? 'metric-down' : 'metric-up'}">
-          ${spentSign} ${formatYen(Math.abs(spentDiff))} vs last month
+          ${spentSign} ${formatYen(Math.abs(spentDiff))} ${t('metric_spent_vs')}
         </div>
       </div>
       <div class="metric-card" style="--grad: linear-gradient(135deg,#11998e,#38ef7d);">
         <span class="metric-icon">🏦</span>
-        <div class="metric-label">Net Savings</div>
+        <div class="metric-label">${t('metric_savings')}</div>
         <div class="metric-value">${formatYen(savings)}</div>
-        <div class="metric-sub ${savings >= income * 0.2 ? 'metric-up' : 'metric-down'}">
-          ${Math.round((savings / income) * 100)}% of income saved
+        <div class="metric-sub ${savings >= monthIncome * 0.2 ? 'metric-up' : 'metric-down'}">
+          ${t('metric_savings_pct', { pct: Math.round((savings / (monthIncome || 1)) * 100) })}
         </div>
       </div>
     </div>
 
+    ${dashboardSelectedMonth === currentYYYYMM() ? `
+    <div class="glass-card" style="margin-bottom:1.75rem;display:flex;align-items:center;gap:16px;--grad: linear-gradient(135deg,#0ea5e9,#22d3ee);">
+      <div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#0ea5e9,#22d3ee);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;">💎</div>
+      <div style="flex:1;">
+        <div class="section-label" style="margin-bottom:2px;">${t('alltime_savings_title')}</div>
+        <div style="font-size:11px;color:var(--text-secondary);">${t('alltime_savings_hint')}</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:22px;font-weight:800;color:${allTimeNet >= 0 ? '#68d391' : '#fc8181'};">${formatYen(allTimeNet)}</div>
+      </div>
+    </div>
+    ` : ''}
+
     <div class="dash-grid">
       <div class="glass-card">
-        <div class="section-label">Budget Progress</div>
-        ${budgetProgressHTML(spent, income)}
+        <div class="section-label">${t('budget_progress')}</div>
+        ${budgetProgressHTML(spent, monthIncome, cur)}
       </div>
       <div class="glass-card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
-        <div class="section-label" style="align-self:flex-start;">Financial Health</div>
+        <div class="section-label" style="align-self:flex-start;">${t('financial_health')}</div>
         <div class="score-container">
           <div class="score-ring-wrap">
             <svg viewBox="0 0 100 100">
@@ -455,39 +570,40 @@ function renderDashboard() {
           </div>
           <div class="score-label" style="color:${sColor};">${sLabel}</div>
           <div style="font-size:11px;color:var(--text-secondary);text-align:center;max-width:160px;line-height:1.5;">
-            ${score >= 70 ? 'Great job! Keep managing your spending.' : score >= 50 ? 'You can improve by reducing discretionary spending.' : 'Your expenses are very high this month.'}
+            ${score >= 70 ? t('score_msg_great') : score >= 50 ? t('score_msg_good') : t('score_msg_bad')}
           </div>
         </div>
       </div>
     </div>
 
     <div class="glass-card">
-      <div class="section-label">Recent Transactions</div>
+      <div class="section-label">${t('recent_tx')}</div>
       <div class="tx-list">${txRows}</div>
     </div>
   `;
 }
 
-function budgetProgressHTML(spent, inc) {
+function budgetProgressHTML(spent, inc, list) {
+  const monthList = list || currentMonthExpenses();
   const pct = Math.min(Math.round((spent / inc) * 100), 100);
   const remaining = Math.max(0, inc - spent);
   const barColor = pct > 85 ? '#fc8181' : pct > 60 ? '#f6ad55' : '#68d391';
   return `
     <div style="margin-bottom:1rem;">
       <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:8px;">
-        <span style="color:var(--text-secondary);">Spent: ${formatYen(spent)}</span>
-        <span style="color:var(--text-secondary);">Budget: ${formatYen(inc)}</span>
+        <span style="color:var(--text-secondary);">${t('spent_colon', { amt: formatYen(spent) })}</span>
+        <span style="color:var(--text-secondary);">${t('budget_colon', { amt: formatYen(inc) })}</span>
       </div>
       <div style="height:10px;background:rgba(255,255,255,0.06);border-radius:5px;overflow:hidden;">
         <div style="height:100%;width:${pct}%;background:${barColor};border-radius:5px;transition:width 0.6s ease;"></div>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:11px;margin-top:6px;">
-        <span style="color:${barColor};">${pct}% used</span>
-        <span style="color:var(--text-secondary);">${formatYen(remaining)} remaining</span>
+        <span style="color:${barColor};">${t('used_suffix', { pct })}</span>
+        <span style="color:var(--text-secondary);">${t('remaining_suffix', { amt: formatYen(remaining) })}</span>
       </div>
     </div>
     ${CATEGORIES.map(c => {
-      const cur = currentMonthExpenses();
+      const cur = monthList;
       const catMap = groupByCategory(cur);
       const val = catMap[c.id] || 0;
       if (!val) return '';
@@ -497,7 +613,7 @@ function budgetProgressHTML(spent, inc) {
           <span style="font-size:16px;width:22px;">${c.emoji}</span>
           <div style="flex:1;">
             <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;">
-              <span style="color:var(--text-secondary);">${c.label}</span>
+              <span style="color:var(--text-secondary);">${catLabel(c.id)}</span>
               <span style="color:var(--text-primary);font-weight:600;">${formatYen(val)} <span style="color:var(--text-muted);">(${catPct}%)</span></span>
             </div>
             <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;">
@@ -516,16 +632,17 @@ function txRowHTML(e) {
     <div class="tx-row" id="tx-${e.id}">
       <div class="tx-icon c-${e.cat}">${cat.emoji}</div>
       <div class="tx-info">
-        <div class="tx-name">${escHTML(e.name)}</div>
+        <div class="tx-name">${escHTML(e.name)}${e.isRecurring ? ` <span title="${escHTML(t('recurring_label'))}">🔁</span>` : ''}</div>
         <div class="tx-date">${formatDate(e.date)}${e.time ? ' · ' + formatTime(e.time) : ''}</div>
+        ${e.note ? `<div class="tx-note">📝 ${escHTML(e.note)}</div>` : ''}
       </div>
       <div class="tx-right">
         <div class="tx-amount" style="color:var(--accent-red);">-${formatYen(e.amount)}</div>
-        <span class="tx-cat c-${e.cat}">${cat.label}</span>
+        <span class="tx-cat c-${e.cat}">${catLabel(e.cat)}</span>
       </div>
       <div class="tx-actions">
-        <button class="btn-icon" title="Edit" onclick="openEditModal('${e.id}')">✏️</button>
-        <button class="btn-icon danger" title="Delete" onclick="deleteExpense('${e.id}')">🗑️</button>
+        <button class="btn-icon" title="${t('edit_expense_title')}" onclick="openEditModal('${e.id}')">✏️</button>
+        <button class="btn-icon danger" title="${t('confirm_delete_expense')}" onclick="deleteExpense('${e.id}')">🗑️</button>
       </div>
     </div>
   `;
@@ -536,59 +653,218 @@ function renderAdd() {
   return `
     <div class="page-header">
       <div>
-        <div class="page-title">Add Expense</div>
-        <div class="page-subtitle">Track a new expense</div>
+        <div class="page-title">${t('add_title')}</div>
+        <div class="page-subtitle">${t('add_subtitle')}</div>
       </div>
     </div>
 
+    <div class="glass-card" style="max-width:640px;margin-bottom:1.25rem;">
+      <div class="section-label">${t('scan_receipt_title')}</div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">${t('scan_receipt_hint')}</div>
+
+      <input type="file" id="receipt-file-input" accept="image/*" capture="environment" style="display:none;" onchange="handleReceiptFileSelected(this)" />
+
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+        <button type="button" class="btn-secondary" onclick="document.getElementById('receipt-file-input').click()">
+          📷 ${t('choose_photo_btn')}
+        </button>
+        <span id="receipt-file-name" style="font-size:12px;color:var(--text-secondary);"></span>
+      </div>
+
+      <div id="receipt-preview-wrap" style="margin-top:12px;display:none;">
+        <img id="receipt-preview-img" style="max-width:100%;max-height:220px;border-radius:10px;border:1px solid var(--border);" />
+      </div>
+
+      <button type="button" class="btn-primary" id="scan-receipt-btn" style="margin-top:12px;display:none;" onclick="scanReceiptPhoto()">
+        🔍 ${t('scan_receipt_btn')}
+      </button>
+
+      <div id="receipt-scan-results" style="margin-top:14px;"></div>
+    </div>
+
     <div class="glass-card" style="max-width:640px;">
-      <div class="section-label">Expense Details</div>
+      <div class="section-label">${t('expense_details')}</div>
       <div class="form-grid">
         <div class="form-group">
-          <label class="form-label">Expense Name</label>
-          <input class="form-input" id="f-name" type="text" placeholder="e.g. Starbucks coffee" />
+          <label class="form-label">${t('expense_name')}</label>
+          <input class="form-input" id="f-name" type="text" placeholder="${t('expense_name_ph')}" />
         </div>
         <div class="form-group">
-          <label class="form-label">Amount (¥)</label>
-          <input class="form-input" id="f-amount" type="number" min="1" placeholder="e.g. 1500" />
+          <label class="form-label">${t('amount_label')}</label>
+          <input class="form-input" id="f-amount" type="number" min="1" placeholder="${t('amount_ph')}" />
         </div>
         <div class="form-group">
-          <label class="form-label">Date</label>
+          <label class="form-label">${t('date_label')}</label>
           <input class="form-input" id="f-date" type="date" value="${todayStr()}" />
         </div>
         <div class="form-group">
-          <label class="form-label">Note (optional)</label>
-          <input class="form-input" id="f-note" type="text" placeholder="Any note..." />
+          <label class="form-label">${t('note_label')}</label>
+          <input class="form-input" id="f-note" type="text" placeholder="${t('note_ph')}" />
         </div>
       </div>
 
       <div class="form-group" style="margin-bottom:1.25rem;">
-        <label class="form-label">Category</label>
+        <label class="form-label">${t('category_label')}</label>
         <div class="cat-grid" id="cat-grid">
           ${CATEGORIES.map(c => `
             <div class="cat-pill" data-cat="${c.id}" onclick="selectCat('${c.id}')">
-              <span>${c.emoji}</span>${c.label}
+              <span>${c.emoji}</span>${catLabel(c.id)}
             </div>
           `).join('')}
         </div>
         <input type="hidden" id="f-cat" value="" />
       </div>
 
+      <label style="display:flex;align-items:center;gap:8px;margin-bottom:1.25rem;font-size:13px;color:var(--text-secondary);cursor:pointer;">
+        <input type="checkbox" id="f-recurring" style="width:16px;height:16px;accent-color:#667eea;" />
+        ${t('recurring_label')}
+      </label>
+
       <button class="btn-primary" onclick="submitExpense()">
-        ➕ Save Expense
+        ${t('save_expense_btn')}
       </button>
     </div>
 
     <div class="glass-card" style="max-width:640px;margin-top:1.25rem;">
       <div style="display:flex;align-items:center;justify-content:space-between;">
-        <div class="section-label" style="margin:0;">Monthly Income</div>
+        <div class="section-label" style="margin:0;">${t('monthly_income_label')}</div>
+        <div class="date-badge">${currentMonthLabel()}</div>
       </div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-top:6px;">${t('income_month_hint')}</div>
       <div style="display:flex;gap:10px;margin-top:1rem;">
-        <input class="form-input" id="income-input" type="number" value="${income}" style="max-width:220px;" />
-        <button class="btn-secondary" onclick="updateIncome()">Update Income</button>
+        <input class="form-input" id="income-input" type="number" value="${incomeForMonth(currentYYYYMM())}" style="max-width:220px;" />
+        <button class="btn-secondary" onclick="updateIncome()">${t('update_income_btn')}</button>
       </div>
     </div>
   `;
+}
+
+/* ── 9b-1. RECEIPT PHOTO SCANNING (Gemini vision → structured line items) ──
+   Two-step flow: (1) upload/snap a photo and let the AI extract candidate
+   line items, (2) user reviews/edits/deselects items in the results panel,
+   then confirms — only then are they pushed into `expenses` and saved.
+   Nothing is written to the server until the user confirms, since OCR can
+   misread amounts. */
+
+let receiptImageBase64 = null;
+let receiptImageMime = null;
+let scannedReceiptItems = [];
+
+function handleReceiptFileSelected(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+
+  document.getElementById('receipt-file-name').textContent = file.name;
+  document.getElementById('receipt-scan-results').innerHTML = '';
+  scannedReceiptItems = [];
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataUrl = reader.result; // "data:image/jpeg;base64,AAAA..."
+    const match = dataUrl.match(/^data:(image\/[a-zA-Z+]+);base64,(.*)$/);
+    if (!match) {
+      showToast(t('toast_bad_image'), true);
+      return;
+    }
+    receiptImageMime = match[1];
+    receiptImageBase64 = match[2];
+
+    const previewImg = document.getElementById('receipt-preview-img');
+    previewImg.src = dataUrl;
+    document.getElementById('receipt-preview-wrap').style.display = '';
+    document.getElementById('scan-receipt-btn').style.display = '';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function scanReceiptPhoto() {
+  if (!receiptImageBase64) return;
+  const btn = document.getElementById('scan-receipt-btn');
+  const resultsEl = document.getElementById('receipt-scan-results');
+  btn.disabled = true;
+  btn.textContent = t('scanning_btn');
+  resultsEl.innerHTML = '';
+
+  try {
+    const res = await apiRequest('scan_receipt', {
+      image_base64: receiptImageBase64,
+      mime_type: receiptImageMime,
+    });
+
+    if (!res.items || !res.items.length) {
+      resultsEl.innerHTML = `<div style="font-size:12px;color:var(--text-secondary);padding:8px 0;">${t('no_items_detected')}</div>`;
+      return;
+    }
+
+    scannedReceiptItems = res.items.map(it => ({
+      name: it.name, amount: it.amount, cat: it.cat, note: it.note || '',
+      date: res.date || todayStr(), include: true,
+    }));
+    resultsEl.innerHTML = renderReceiptItemsHTML(res.store);
+  } catch (err) {
+    resultsEl.innerHTML = `<div style="font-size:12px;color:#fc8181;padding:8px 0;">⚠️ ${escHTML(err.message || t('ai_error'))}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = `🔍 ${t('scan_receipt_btn')}`;
+  }
+}
+
+function renderReceiptItemsHTML(store) {
+  const rows = scannedReceiptItems.map((it, i) => `
+    <div class="budget-limit-row" style="align-items:center;">
+      <input type="checkbox" ${it.include ? 'checked' : ''} onchange="scannedReceiptItems[${i}].include=this.checked" style="width:16px;height:16px;accent-color:#667eea;flex-shrink:0;" />
+      <input class="form-input" type="text" value="${escHTML(it.name)}" style="flex:1;max-width:none;" oninput="scannedReceiptItems[${i}].name=this.value" placeholder="${t('item_name_ph')}" />
+      <input class="form-input" type="number" value="${it.amount}" style="max-width:100px;" oninput="scannedReceiptItems[${i}].amount=parseFloat(this.value)||0" />
+      <select class="form-input" style="max-width:130px;" onchange="scannedReceiptItems[${i}].cat=this.value">
+        ${CATEGORIES.map(c => `<option value="${c.id}" ${c.id === it.cat ? 'selected' : ''}>${c.emoji} ${catLabel(c.id)}</option>`).join('')}
+      </select>
+    </div>
+  `).join('');
+
+  return `
+    <div class="form-group" style="margin-bottom:10px;">
+      <label class="form-label">${t('store_name_label')}</label>
+      <input class="form-input" id="scanned-store-name" type="text" value="${escHTML(store || '')}" placeholder="${t('store_name_ph')}" />
+    </div>
+    <div style="font-size:11px;color:var(--text-secondary);margin-bottom:6px;">${t('scan_items_hint')}</div>
+    ${rows}
+    <button type="button" class="btn-primary" style="margin-top:12px;" onclick="confirmScannedExpenses()">
+      ✅ ${t('add_scanned_btn')}
+    </button>
+  `;
+}
+
+async function confirmScannedExpenses() {
+  const storeName = (document.getElementById('scanned-store-name')?.value || '').trim() || t('receipt_fallback_name');
+  const chosen = scannedReceiptItems.filter(it => it.include && it.amount > 0 && it.name.trim());
+  if (!chosen.length) return showToast(t('toast_select_at_least_one'), true);
+
+  // One expense per category, headlined with the store name; the individual
+  // item names + amounts become the note. (Previously each item became its
+  // own expense named after the item, which buried the store name and left
+  // the note field empty — this groups by category instead.)
+  const byCat = {};
+  chosen.forEach(it => {
+    if (!byCat[it.cat]) byCat[it.cat] = { total: 0, parts: [], date: it.date };
+    byCat[it.cat].total += it.amount;
+    byCat[it.cat].parts.push(`${it.name.trim()} (${formatYen(it.amount)})`);
+  });
+
+  Object.entries(byCat).forEach(([cat, group]) => {
+    expenses.push({
+      id: uid(), name: storeName, amount: group.total, cat,
+      date: group.date || todayStr(), note: group.parts.join(', '),
+      time: getLocalTimestamp(), isRecurring: false,
+    });
+  });
+
+  if (!await saveData()) return;
+  showToast(t('toast_expense_added', { n: Object.keys(byCat).length }));
+
+  scannedReceiptItems = [];
+  receiptImageBase64 = null;
+  receiptImageMime = null;
+  navigateTo('dashboard');
 }
 
 function selectCat(id) {
@@ -604,40 +880,41 @@ async function submitExpense() {
   const date   = document.getElementById('f-date').value;
   const note   = document.getElementById('f-note').value.trim();
   const cat    = document.getElementById('f-cat').value;
+  const isRecurring = document.getElementById('f-recurring').checked;
 
-  if (!name)         return showToast('Please enter a name', true);
-  if (!amount || amount <= 0) return showToast('Please enter a valid amount', true);
-  if (!date)         return showToast('Please pick a date', true);
-  if (!cat)          return showToast('Please select a category', true);
+  if (!name)         return showToast(t('toast_enter_name'), true);
+  if (!amount || amount <= 0) return showToast(t('toast_enter_amount'), true);
+  if (!date)         return showToast(t('toast_pick_date'), true);
+  if (!cat)          return showToast(t('toast_select_category'), true);
 
-  expenses.push({ id: uid(), name, amount, date, note, cat, time: getLocalTimestamp() });
+  expenses.push({ id: uid(), name, amount, date, note, cat, time: getLocalTimestamp(), isRecurring });
   if (!await saveData()) return;
-  showToast('✅ Expense saved!');
+  showToast(t('toast_expense_saved'));
   navigateTo('dashboard');
 }
 
 async function updateIncome() {
   const val = parseFloat(document.getElementById('income-input').value);
-  if (!val || val <= 0) return showToast('Enter a valid income', true);
-  income = val;
+  if (!val || val <= 0) return showToast(t('toast_enter_valid_income'), true);
+  incomeByMonth = { ...incomeByMonth, [currentYYYYMM()]: val };
   if (!await saveData()) return;
-  showToast('✅ Income updated!');
+  showToast(t('toast_income_updated'));
 }
 
 /* ── 9c. ANALYTICS ── */
 function exportExpensesToExcel() {
   if (!expenses.length) {
-    alert('No expenses to export yet.');
+    alert(t('no_export_alert'));
     return;
   }
 
   const rows = [...expenses]
-    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .sort((a, b) => txSortKey(b) - txSortKey(a))
     .map(e => ({
       Date: e.date,
       Time: formatTime(e.time),
       Name: e.name,
-      Category: CAT_MAP[e.cat] ? CAT_MAP[e.cat].label : e.cat,
+      Category: CAT_MAP[e.cat] ? catLabel(e.cat) : e.cat,
       'Amount (¥)': e.amount,
       Note: e.note || ''
     }));
@@ -656,7 +933,9 @@ function exportExpensesToExcel() {
 }
 
 function renderAnalytics() {
-  const cur   = currentMonthExpenses();
+  if (!analyticsSelectedMonth) analyticsSelectedMonth = currentYYYYMM();
+
+  const cur   = expensesForMonthKey(analyticsSelectedMonth);
   const catMap = groupByCategory(cur);
   const spent  = totalSpent(cur);
 
@@ -668,7 +947,7 @@ function renderAnalytics() {
         <div class="legend-item">
           <div class="legend-left">
             <div class="legend-dot" style="background:${c.chartColor};"></div>
-            <span class="legend-name">${c.emoji} ${c.label}</span>
+            <span class="legend-name">${c.emoji} ${catLabel(c.id)}</span>
           </div>
           <span>
             <span class="legend-val">${formatYen(catMap[c.id])}</span>
@@ -681,48 +960,52 @@ function renderAnalytics() {
   return `
     <div class="page-header">
       <div>
-        <div class="page-title">Analytics</div>
-        <div class="page-subtitle">Spending breakdown & trends</div>
+        <div class="page-title">${t('analytics_title')}</div>
+        <div class="page-subtitle">${t('analytics_subtitle')}</div>
       </div>
       <div style="display:flex;align-items:center;gap:10px;">
-        <div class="date-badge">${currentMonthLabel()}</div>
-        <button onclick="exportExpensesToExcel()" class="login-btn" style="width:auto;padding:8px 16px;font-size:13px;">⬇️ Export Excel</button>
+        <select class="month-select-badge" id="analytics-month-select" onchange="analyticsSelectedMonth=this.value; navigateTo('analytics')">
+          ${monthPickerOptions().map(o => `<option value="${o.value}" ${o.value === analyticsSelectedMonth ? 'selected' : ''}>${o.label}</option>`).join('')}
+        </select>
+        <button onclick="exportExpensesToExcel()" class="login-btn" style="width:auto;padding:8px 16px;font-size:13px;">${t('export_excel_btn')}</button>
       </div>
     </div>
 
     <div class="analytics-grid">
       <div class="glass-card">
-        <div class="section-label">Category Breakdown</div>
+        <div class="section-label">${t('category_breakdown')}</div>
         <div class="chart-wrap" style="height:240px;">
           <canvas id="pieChart" role="img" aria-label="Pie chart of spending by category">Category spending breakdown.</canvas>
         </div>
       </div>
       <div class="glass-card" style="display:flex;flex-direction:column;justify-content:center;">
-        <div class="section-label">Legend</div>
-        <div class="legend-list">${legendHTML || '<p style="color:var(--text-muted);font-size:13px;">No data this month</p>'}</div>
+        <div class="section-label">${t('legend_title')}</div>
+        <div class="legend-list">${legendHTML || `<p style="color:var(--text-muted);font-size:13px;">${t('no_data_month')}</p>`}</div>
       </div>
     </div>
 
     <div class="glass-card">
-      <div class="section-label">6-Month Trend</div>
+      <div class="section-label">${t('trend_6mo')}</div>
       <div class="chart-wrap" style="height:220px;">
         <canvas id="trendChart" role="img" aria-label="Bar chart of monthly spending over 6 months">Monthly spending trend.</canvas>
       </div>
     </div>
 
     <div class="glass-card">
-      <div class="section-label">All Transactions</div>
+      <div class="section-label">${t('all_transactions')}</div>
       <div class="tx-list">
-        ${[...expenses].sort((a,b) => new Date(b.date)-new Date(a.date)).map(e => txRowHTML(e)).join('')
-          || '<div class="empty-state"><div class="icon">📋</div><p>No transactions yet</p></div>'}
+        ${[...cur].sort((a,b) => txSortKey(b) - txSortKey(a)).map(e => txRowHTML(e)).join('')
+          || `<div class="empty-state"><div class="icon">📋</div><p>${t('empty_tx_all')}</p></div>`}
       </div>
     </div>
   `;
 }
 
 function renderAnalyticsCharts() {
+  const selMonth = analyticsSelectedMonth || currentYYYYMM();
+
   // Pie
-  const cur    = currentMonthExpenses();
+  const cur    = expensesForMonthKey(selMonth);
   const catMap = groupByCategory(cur);
   const cats   = CATEGORIES.filter(c => catMap[c.id] > 0);
 
@@ -732,7 +1015,7 @@ function renderAnalyticsCharts() {
     chartInstances['pie'] = new Chart(pieEl, {
       type: 'doughnut',
       data: {
-        labels: cats.map(c => c.label),
+        labels: cats.map(c => catLabel(c.id)),
         datasets: [{
           data: cats.map(c => catMap[c.id]),
           backgroundColor: cats.map(c => c.chartColor),
@@ -749,14 +1032,14 @@ function renderAnalyticsCharts() {
     });
   }
 
-  // Trend bar (last 6 months)
+  // Trend bar (6 months ending on the selected month)
   destroyChart('trend');
   const trendEl = document.getElementById('trendChart');
   if (trendEl) {
     const months = [];
-    const now    = new Date();
+    const [selY, selM] = selMonth.split('-').map(Number); // selM is 1-based
     for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const d = new Date(selY, (selM - 1) - i, 1);
       const label = d.toLocaleDateString('en-US', { month: 'short' });
       const total = expenses.filter(e => {
         const ed = new Date(e.date);
@@ -786,15 +1069,22 @@ function renderAnalyticsCharts() {
 }
 
 /* ── 9d. AI ADVISOR ── */
+function currentYYYYMM() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
 function renderAI() {
   const cur    = currentMonthExpenses();
-  const advice = generateAdvice(cur, income);
+  const advice = generateAdvice(cur, incomeForMonth(currentYYYYMM()));
+
+  const typeLabel = { danger: t('ai_type_alert'), warning: t('ai_type_warning'), success: t('ai_type_success'), info: t('ai_type_info') };
 
   const adviceHTML = advice.map(a => `
     <div class="advice-item advice-${a.type}">
       <div class="advice-icon">${a.icon}</div>
       <div>
-        <div class="advice-type">${a.type === 'danger' ? '⚠️ Alert' : a.type === 'warning' ? '⚡ Warning' : a.type === 'success' ? '✅ Great' : 'ℹ️ Tip'}</div>
+        <div class="advice-type">${typeLabel[a.type] || typeLabel.info}</div>
         <div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:5px;">${a.title}</div>
         <div class="advice-text">${a.text}</div>
       </div>
@@ -804,8 +1094,8 @@ function renderAI() {
   return `
     <div class="page-header">
       <div>
-        <div class="page-title">AI Advisor</div>
-        <div class="page-subtitle">Personalized financial advice</div>
+        <div class="page-title">${t('ai_title')}</div>
+        <div class="page-subtitle">${t('ai_subtitle')}</div>
       </div>
     </div>
 
@@ -813,22 +1103,165 @@ function renderAI() {
       <div class="ai-header">
         <div class="ai-avatar">🤖</div>
         <div>
-          <div class="ai-title">NEOPOCKET AI Coach</div>
-          <div class="ai-subtitle">Powered by smart spending analysis</div>
+          <div class="ai-title">${t('ai_coach')}</div>
+          <div class="ai-subtitle">${t('ai_powered')}</div>
         </div>
       </div>
       <div style="padding:14px 16px;background:rgba(99,179,237,0.07);border:1px solid rgba(99,179,237,0.15);border-radius:10px;font-size:13px;color:var(--text-secondary);line-height:1.7;">
-        今月の支出データを分析しました。${currentMonthExpenses().length}件の取引から、あなたへの最適なアドバイスを生成しました。
+        ${t('ai_summary', { n: currentMonthExpenses().length })}
       </div>
     </div>
 
     <div class="advice-list">${adviceHTML}</div>
+
+    <div class="glass-card" style="margin-top:1.25rem;">
+      <div class="section-label">${t('ask_ai')}</div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">
+        ${t('ask_ai_hint')}
+      </div>
+
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
+        ${AI_QUICK_QUESTIONS.map((q, i) => `
+          <button type="button" class="ai-quick-chip" onclick="askAiQuickQuestion(${i})">
+            ${q.emoji} ${t('quick_q_' + i)}
+          </button>
+        `).join('')}
+      </div>
+
+      <div id="ai-chat-log" style="display:flex;flex-direction:column;gap:10px;max-height:420px;overflow-y:auto;margin-bottom:12px;padding-right:4px;"></div>
+
+      <form id="ai-chat-form" style="display:flex;flex-direction:column;gap:10px;" onsubmit="handleAiChatSubmit(event)">
+        <textarea
+          id="ai-chat-input"
+          class="form-textarea"
+          placeholder="${t('chat_placeholder')}"
+          rows="4"
+          style="width:100%;font-size:16px;line-height:1.6;min-height:110px;resize:vertical;font-family:'Segoe UI','Hiragino Kaku Gothic ProN','Yu Gothic','Meiryo',system-ui,-apple-system,sans-serif;"
+          onkeydown="handleAiChatKeydown(event)"
+        ></textarea>
+        <button type="submit" class="btn-primary" id="ai-chat-send-btn" style="align-self:flex-end;padding:11px 28px;">${t('send_btn')}</button>
+      </form>
+    </div>
   `;
+}
+
+/* ── 9d-2. AI ADVISOR CHAT (natural-language expense/receipt entry + Q&A) ──
+   Calls the backend "ai_advisor" engine, which strictly filters to the
+   selected month, checks budget alerts, mock-converts to the selected
+   currency, tracks savings-goal runway, and flags recurring subscriptions —
+   then narrates it all through Gemini in the app's persona. This is
+   separate from generateAdvice() above (the rule-based cards), which is
+   left untouched. */
+
+const AI_QUICK_QUESTIONS = [
+  { emoji: '📋', label: 'Full monthly briefing',
+    question: 'Give me my full financial briefing for this month.' },
+  { emoji: '🚨', label: 'Any budget alerts?',
+    question: 'Am I close to or over any of my category budget limits this month?' },
+  { emoji: '🔁', label: 'Subscription drainage check',
+    question: 'How much am I losing every month to recurring subscriptions?' },
+  { emoji: '🎯', label: 'Savings goal runway',
+    question: 'At my current savings rate, how long until I hit my savings goals?' },
+  { emoji: '🔍', label: 'Where am I overspending?',
+    question: 'Looking at my expenses this month, which category am I overspending in the most, and by how much?' },
+];
+
+function askAiQuickQuestion(index) {
+  const q = AI_QUICK_QUESTIONS[index];
+  if (!q) return;
+  const input = document.getElementById('ai-chat-input');
+  if (input) input.value = q.question;
+  sendAiChatMessage(q.question);
+}
+
+function appendAiChatBubble(text, who) {
+  const log = document.getElementById('ai-chat-log');
+  if (!log) return;
+  const bubble = document.createElement('div');
+  const isUser = who === 'user';
+  bubble.style.cssText = `
+    align-self:${isUser ? 'flex-end' : 'flex-start'};
+    max-width:90%;
+    padding:10px 13px;
+    border-radius:12px;
+    font-size:14px;
+    line-height:1.6;
+    font-family:'Segoe UI','Hiragino Kaku Gothic ProN','Yu Gothic','Meiryo',system-ui,-apple-system,sans-serif;
+    background:${isUser ? 'var(--grad-blue)' : 'rgba(255,255,255,0.06)'};
+    border:${isUser ? 'none' : '1px solid var(--border)'};
+    color:${isUser ? '#fff' : 'var(--text-primary)'};
+  `;
+  if (isUser) {
+    bubble.style.whiteSpace = 'pre-wrap';
+    bubble.textContent = text;
+  } else {
+    // AI replies are Markdown from the model; render safely (escape first, then a
+    // small whitelist of Markdown features — see renderMarkdownLite()).
+    bubble.innerHTML = renderMarkdownLite(text);
+  }
+  log.appendChild(bubble);
+  log.scrollTop = log.scrollHeight;
+}
+
+function handleAiChatKeydown(e) {
+  // Let Shift+Enter add a newline, and don't hijack Enter while the user
+  // is still composing Japanese (or other IME) text — e.g. converting
+  // kanji candidates. Only plain Enter submits the message.
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) {
+    e.preventDefault();
+    document.getElementById('ai-chat-form').requestSubmit();
+  }
+}
+
+async function handleAiChatSubmit(e) {
+  e.preventDefault();
+  const input = document.getElementById('ai-chat-input');
+  const message = input.value.trim();
+  if (!message) return;
+  await sendAiChatMessage(message);
+}
+
+async function sendAiChatMessage(message) {
+  const input = document.getElementById('ai-chat-input');
+  const btn = document.getElementById('ai-chat-send-btn');
+  if (!message) return;
+
+  appendAiChatBubble(message, 'user');
+  input.value = '';
+  input.disabled = true;
+  btn.disabled = true;
+  btn.textContent = t('sending_btn');
+
+  try {
+    const res = await apiRequest('ai_advisor', {
+      user_query: message,
+      selected_month: currentYYYYMM(),
+      currency_context: currency,
+    });
+    appendAiChatBubble(res.reply || '...', 'ai');
+
+    if (res.intent === 'add_expense' && Array.isArray(res.expenses) && res.expenses.length) {
+      // The backend already saved these rows directly to the DB, so just
+      // refresh local state (expenses/income/etc.) from the server instead
+      // of re-saving. We deliberately do NOT re-render the whole AI page
+      // here, so the chat conversation stays visible; the refreshed
+      // advice/rule cards show next time this page is opened.
+      await loadData();
+      showToast(t('toast_expense_added', { n: res.expenses.length }));
+    }
+  } catch (err) {
+    appendAiChatBubble('⚠️ ' + (err.message || t('ai_error')), 'ai');
+  } finally {
+    input.disabled = false;
+    btn.disabled = false;
+    btn.textContent = t('send_btn');
+    input.focus();
+  }
 }
 
 /* ── 9e. FORECAST ── */
 function renderForecast() {
-  const forecast   = calcForecast(currentMonthExpenses(), income);
+  const forecast   = calcForecast(currentMonthExpenses(), incomeForMonth(currentYYYYMM()));
   const statusColor = { safe: '#68d391', warn: '#f6ad55', danger: '#fc8181' };
   const statusGrad  = {
     safe:   'linear-gradient(135deg,#11998e,#38ef7d)',
@@ -840,9 +1273,9 @@ function renderForecast() {
     <div class="forecast-card" style="--grad:${statusGrad[f.status]};">
       <div class="forecast-month">${f.label}</div>
       <div class="forecast-value" style="color:${statusColor[f.status]};">${formatYen(f.estimatedSavings)}</div>
-      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px;">est. savings</div>
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px;">${t('est_savings')}</div>
       <div class="forecast-tag" style="background:${statusColor[f.status]}22;color:${statusColor[f.status]};">
-        ${f.status === 'safe' ? '✅ On track' : f.status === 'warn' ? '⚠️ Watch' : '🚨 At risk'}
+        ${f.status === 'safe' ? t('status_on_track') : f.status === 'warn' ? t('status_watch') : t('status_at_risk')}
       </div>
     </div>
   `).join('');
@@ -850,38 +1283,38 @@ function renderForecast() {
   return `
     <div class="page-header">
       <div>
-        <div class="page-title">Forecast</div>
-        <div class="page-subtitle">Next 3-month balance prediction</div>
+        <div class="page-title">${t('forecast_title')}</div>
+        <div class="page-subtitle">${t('forecast_subtitle')}</div>
       </div>
     </div>
 
     <div class="forecast-grid">${forecastCards}</div>
 
     <div class="glass-card" style="margin-bottom:1.25rem;">
-      <div class="section-label">Projected Balance Trend</div>
+      <div class="section-label">${t('projected_trend')}</div>
       <div class="chart-wrap" style="height:220px;">
         <canvas id="forecastChart" role="img" aria-label="Line chart of projected savings over 3 months">Balance forecast.</canvas>
       </div>
     </div>
 
     <div class="glass-card">
-      <div class="section-label">Prediction Basis</div>
+      <div class="section-label">${t('prediction_basis')}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px;">
         <div>
-          <div style="color:var(--text-secondary);margin-bottom:4px;">Current month spent</div>
+          <div style="color:var(--text-secondary);margin-bottom:4px;">${t('current_month_spent')}</div>
           <div style="font-weight:700;">${formatYen(totalSpent(currentMonthExpenses()))}</div>
         </div>
         <div>
-          <div style="color:var(--text-secondary);margin-bottom:4px;">Monthly income</div>
-          <div style="font-weight:700;">${formatYen(income)}</div>
+          <div style="color:var(--text-secondary);margin-bottom:4px;">${t('monthly_income_label2')}</div>
+          <div style="font-weight:700;">${formatYen(incomeForMonth(currentYYYYMM()))}</div>
         </div>
         <div>
-          <div style="color:var(--text-secondary);margin-bottom:4px;">Growth assumption</div>
-          <div style="font-weight:700;">+2% per month</div>
+          <div style="color:var(--text-secondary);margin-bottom:4px;">${t('growth_assumption')}</div>
+          <div style="font-weight:700;">${t('growth_value')}</div>
         </div>
         <div>
-          <div style="color:var(--text-secondary);margin-bottom:4px;">Data points</div>
-          <div style="font-weight:700;">${expenses.length} transactions</div>
+          <div style="color:var(--text-secondary);margin-bottom:4px;">${t('data_points')}</div>
+          <div style="font-weight:700;">${expenses.length} ${t('transactions_word')}</div>
         </div>
       </div>
     </div>
@@ -894,11 +1327,12 @@ function renderForecastChart() {
   if (!el) return;
 
   const cur      = currentMonthExpenses();
-  const forecast = calcForecast(cur, income);
+  const monthIncome = incomeForMonth(currentYYYYMM());
+  const forecast = calcForecast(cur, monthIncome);
   const now      = new Date();
   const nowLabel = now.toLocaleDateString('en-US', { month: 'short' });
   const labels   = [nowLabel, ...forecast.map(f => f.label.split(' ')[0])];
-  const data     = [Math.max(0, income - totalSpent(cur)), ...forecast.map(f => f.estimatedSavings)];
+  const data     = [Math.max(0, monthIncome - totalSpent(cur)), ...forecast.map(f => f.estimatedSavings)];
 
   chartInstances['forecast'] = new Chart(el, {
     type: 'line',
@@ -912,7 +1346,7 @@ function renderForecastChart() {
         tension: 0.4,
         fill: true,
         pointRadius: 5,
-        pointBackgroundColor: data.map(v => v >= income * 0.2 ? '#68d391' : '#f6ad55'),
+        pointBackgroundColor: data.map(v => v >= monthIncome * 0.2 ? '#68d391' : '#f6ad55'),
         pointBorderColor: '#060b18',
         pointBorderWidth: 2,
       }]
@@ -930,10 +1364,10 @@ function renderForecastChart() {
 ───────────────────────────────────────────────────── */
 
 async function deleteExpense(id) {
-  if (!confirm('Delete this expense?')) return;
+  if (!confirm(t('confirm_delete_expense'))) return;
   expenses = expenses.filter(e => e.id !== id);
   if (!await saveData()) return;
-  showToast('🗑️ Expense deleted');
+  showToast(t('toast_expense_deleted'));
   navigateTo(currentPage);
 }
 
@@ -947,39 +1381,43 @@ function openEditModal(id) {
   overlay.innerHTML = `
     <div class="modal">
       <div class="modal-header">
-        <div class="modal-title">Edit Expense</div>
+        <div class="modal-title">${t('edit_expense_title')}</div>
         <button class="modal-close" onclick="closeModal()">✕</button>
       </div>
       <div class="form-grid">
         <div class="form-group">
-          <label class="form-label">Name</label>
+          <label class="form-label">${t('expense_name')}</label>
           <input class="form-input" id="edit-name" value="${escHTML(e.name)}" />
         </div>
         <div class="form-group">
-          <label class="form-label">Amount (¥)</label>
+          <label class="form-label">${t('amount_label')}</label>
           <input class="form-input" id="edit-amount" type="number" value="${e.amount}" />
         </div>
         <div class="form-group">
-          <label class="form-label">Date</label>
+          <label class="form-label">${t('date_label')}</label>
           <input class="form-input" id="edit-date" type="date" value="${e.date}" />
         </div>
         <div class="form-group">
-          <label class="form-label">Note</label>
+          <label class="form-label">${t('note_label')}</label>
           <input class="form-input" id="edit-note" value="${escHTML(e.note || '')}" />
         </div>
       </div>
       <div class="form-group" style="margin-bottom:1.25rem;">
-        <label class="form-label">Category</label>
+        <label class="form-label">${t('category_label')}</label>
         <div class="cat-grid" id="edit-cat-grid">
           ${CATEGORIES.map(c => `
             <div class="cat-pill ${c.id === e.cat ? 'selected' : ''}" data-cat="${c.id}" onclick="editSelectCat('${c.id}')">
-              <span>${c.emoji}</span>${c.label}
+              <span>${c.emoji}</span>${catLabel(c.id)}
             </div>
           `).join('')}
         </div>
         <input type="hidden" id="edit-cat" value="${e.cat}" />
       </div>
-      <button class="btn-primary" onclick="saveEdit('${id}')">💾 Save Changes</button>
+      <label style="display:flex;align-items:center;gap:8px;margin-bottom:1.25rem;font-size:13px;color:var(--text-secondary);cursor:pointer;">
+        <input type="checkbox" id="edit-recurring" style="width:16px;height:16px;accent-color:#667eea;" ${e.isRecurring ? 'checked' : ''} />
+        ${t('recurring_label')}
+      </label>
+      <button class="btn-primary" onclick="saveEdit('${id}')">${t('save_changes_btn')}</button>
     </div>
   `;
 }
@@ -996,14 +1434,15 @@ async function saveEdit(id) {
   const date   = document.getElementById('edit-date').value;
   const note   = document.getElementById('edit-note').value.trim();
   const cat    = document.getElementById('edit-cat').value;
+  const isRecurring = document.getElementById('edit-recurring').checked;
 
-  if (!name || !amount || !date || !cat) return showToast('Fill all fields', true);
+  if (!name || !amount || !date || !cat) return showToast(t('toast_fill_fields'), true);
 
   const idx = expenses.findIndex(e => e.id === id);
   if (idx >= 0) {
-    expenses[idx] = { ...expenses[idx], name, amount, date, note, cat };
+    expenses[idx] = { ...expenses[idx], name, amount, date, note, cat, isRecurring };
     if (!await saveData()) return;
-    showToast('✅ Expense updated!');
+    showToast(t('toast_expense_updated'));
     closeModal();
     navigateTo(currentPage);
   }
@@ -1068,6 +1507,56 @@ function todayStr() {
   return new Date().toISOString().split('T')[0];
 }
 
+/* Minimal, safe Markdown → HTML for AI Advisor replies. Escapes everything
+   first (so the model can never inject raw HTML/script), then layers on
+   just the handful of Markdown features the advisor prompt is asked to use:
+   **bold**, "- " bullet lists, "---" rules, and simple "| a | b |" tables. */
+function renderMarkdownLite(raw) {
+  const lines = escHTML(raw || '').split(/\r?\n/);
+  let html = '';
+  let inList = false;
+  let tableBuffer = [];
+
+  const flushList = () => { if (inList) { html += '</ul>'; inList = false; } };
+  const flushTable = () => {
+    if (!tableBuffer.length) return;
+    const rows = tableBuffer.filter(r => !/^\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?$/.test(r));
+    html += '<table class="md-table"><tbody>' + rows.map((r, i) => {
+      const cells = r.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+      const tag = i === 0 ? 'th' : 'td';
+      return `<tr>${cells.map(c => `<${tag}>${inlineMd(c)}</${tag}>`).join('')}</tr>`;
+    }).join('') + '</tbody></table>';
+    tableBuffer = [];
+  };
+  const inlineMd = s => s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+  lines.forEach(line => {
+    const trimmed = line.trim();
+    if (/^\|.*\|$/.test(trimmed)) {
+      flushList();
+      tableBuffer.push(trimmed);
+      return;
+    }
+    flushTable();
+
+    if (/^---+$/.test(trimmed)) {
+      flushList();
+      html += '<hr class="md-hr" />';
+    } else if (/^[-*]\s+/.test(trimmed)) {
+      if (!inList) { html += '<ul class="md-list">'; inList = true; }
+      html += `<li>${inlineMd(trimmed.replace(/^[-*]\s+/, ''))}</li>`;
+    } else if (trimmed === '') {
+      flushList();
+    } else {
+      flushList();
+      html += `<p class="md-p">${inlineMd(trimmed)}</p>`;
+    }
+  });
+  flushList();
+  flushTable();
+  return html;
+}
+
 function escHTML(str) {
   return String(str)
     .replace(/&/g, '&amp;')
@@ -1081,7 +1570,7 @@ function escHTML(str) {
 ───────────────────────────────────────────────────── */
 
 async function handleLogout() {
-  if (confirm('Log out of NEOPOCKET AI?')) {
+  if (confirm(t('logout_confirm'))) {
     try {
       await apiRequest('logout');
     } catch (e) {
