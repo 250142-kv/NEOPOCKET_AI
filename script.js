@@ -229,6 +229,60 @@ function allTimeNetSavings() {
   return totalIncomeAllTime - totalSpent(expenses);
 }
 
+// The earliest month with any recorded activity (an income entry or an
+// expense) — i.e. the month the person effectively started using the app.
+// Falls back to the current month if there's no data at all yet.
+function firstDataMonthKey() {
+  const keys = Object.keys(incomeByMonth);
+  expenses.forEach(e => {
+    const d = new Date(e.date);
+    if (!isNaN(d)) keys.push(monthKeyOf(d.getFullYear(), d.getMonth()));
+  });
+  if (!keys.length) return currentYYYYMM();
+  return keys.sort()[0];
+}
+
+// Every month from `startKey` through the real current month, ascending.
+function monthRangeToNow(startKey) {
+  const [sy, sm] = startKey.split('-').map(Number);
+  const now = new Date();
+  const end = new Date(now.getFullYear(), now.getMonth(), 1);
+  const months = [];
+  let d = new Date(sy, sm - 1, 1);
+  while (d <= end) {
+    months.push(monthKeyOf(d.getFullYear(), d.getMonth()));
+    d = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+  }
+  return months;
+}
+
+// Earliest month with any recorded activity (an expense or a set income),
+// used as the start of the "since you started using the app" breakdown.
+// Falls back to the current month if there's no data at all yet.
+function earliestMonthKey() {
+  const keys = [];
+  expenses.forEach(e => {
+    const d = new Date(e.date);
+    if (!isNaN(d)) keys.push(monthKeyOf(d.getFullYear(), d.getMonth()));
+  });
+  Object.keys(incomeByMonth).forEach(k => keys.push(k));
+  if (!keys.length) return currentYYYYMM();
+  return keys.sort()[0];
+}
+
+// Every "YYYY-MM" key from startKey to endKey inclusive, oldest first.
+function monthsRange(startKey, endKey) {
+  let [y, m] = startKey.split('-').map(Number); // m is 1-based
+  const [ey, em] = endKey.split('-').map(Number);
+  const result = [];
+  while (y < ey || (y === ey && m <= em)) {
+    result.push(`${y}-${String(m).padStart(2, '0')}`);
+    m++;
+    if (m > 12) { m = 1; y++; }
+  }
+  return result;
+}
+
 function groupByCategory(list) {
   const map = {};
   CATEGORIES.forEach(c => { map[c.id] = 0; });
@@ -536,14 +590,15 @@ function renderDashboard() {
     </div>
 
     ${dashboardSelectedMonth === currentYYYYMM() ? `
-    <div class="glass-card" style="margin-bottom:1.75rem;display:flex;align-items:center;gap:16px;--grad: linear-gradient(135deg,#0ea5e9,#22d3ee);">
+    <div class="glass-card" style="margin-bottom:1.75rem;display:flex;align-items:center;gap:16px;--grad: linear-gradient(135deg,#0ea5e9,#22d3ee);cursor:pointer;" onclick="openAllTimeSavingsModal()">
       <div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#0ea5e9,#22d3ee);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;">💎</div>
       <div style="flex:1;">
         <div class="section-label" style="margin-bottom:2px;">${t('alltime_savings_title')}</div>
-        <div style="font-size:11px;color:var(--text-secondary);">${t('alltime_savings_hint')}</div>
+        <div style="font-size:11px;color:var(--text-secondary);">${t('alltime_savings_hint', { date: monthKeyLabel(firstDataMonthKey()) })}</div>
       </div>
       <div style="text-align:right;">
         <div style="font-size:22px;font-weight:800;color:${allTimeNet >= 0 ? '#68d391' : '#fc8181'};">${formatYen(allTimeNet)}</div>
+        <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">${t('view_breakdown')} →</div>
       </div>
     </div>
     ` : ''}
@@ -643,6 +698,54 @@ function txRowHTML(e) {
       <div class="tx-actions">
         <button class="btn-icon" title="${t('edit_expense_title')}" onclick="openEditModal('${e.id}')">✏️</button>
         <button class="btn-icon danger" title="${t('confirm_delete_expense')}" onclick="deleteExpense('${e.id}')">🗑️</button>
+      </div>
+    </div>
+  `;
+}
+
+/* ── 9a-1. ALL-TIME NET SAVINGS BREAKDOWN (modal) ── */
+function openAllTimeSavingsModal() {
+  const startKey = firstDataMonthKey();
+  const months   = monthRangeToNow(startKey);
+  const total    = allTimeNetSavings();
+
+  const rows = months.map(k => {
+    const inc = incomeForMonth(k);
+    const exp = totalSpent(expensesForMonthKey(k));
+    const net = inc - exp;
+    const netColor = net >= 0 ? '#68d391' : '#fc8181';
+    return `
+      <tr>
+        <td>${monthKeyLabel(k)}</td>
+        <td>${formatYen(inc)}</td>
+        <td>${formatYen(exp)}</td>
+        <td style="color:${netColor};font-weight:700;">${formatYen(net)}</td>
+      </tr>
+    `;
+  }).join('');
+
+  const overlay = document.getElementById('edit-modal');
+  overlay.classList.add('open');
+  overlay.innerHTML = `
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <div class="modal-title">${t('alltime_modal_title')}</div>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">
+        ${t('alltime_modal_since', { date: monthKeyLabel(startKey) })}
+      </div>
+      <div class="modal-body-scroll">
+        <table class="md-table">
+          <thead>
+            <tr><th>${t('th_month')}</th><th>${t('th_income')}</th><th>${t('th_spent')}</th><th>${t('th_net')}</th></tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+        <span style="font-size:13px;color:var(--text-secondary);">${t('alltime_modal_total')}</span>
+        <span style="font-size:18px;font-weight:800;color:${total >= 0 ? '#68d391' : '#fc8181'};">${formatYen(total)}</span>
       </div>
     </div>
   `;

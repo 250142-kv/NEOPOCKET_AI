@@ -613,6 +613,13 @@ body::before {
 }
 .modal-close:hover { color: var(--text-primary); }
 
+.modal-wide { max-width: 640px; }
+.modal-body-scroll {
+  max-height: 55vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
 /* ── Toast ── */
 .toast {
   position: fixed;
