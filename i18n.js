@@ -33,6 +33,12 @@ en: {
   alltime_modal_title:'Month-by-Month Breakdown',
   alltime_modal_since:'Since {date}', alltime_modal_total:'All-time total',
   th_month:'Month', th_income:'Income', th_spent:'Spent', th_net:'Net',
+  metric_income_modal_title:'Monthly Income Details', metric_income_modal_desc:'Your set income for {month}',
+  metric_spent_modal_title:'Spending Details', metric_spent_modal_desc:'Category breakdown for {month}',
+  metric_savings_modal_title:'Net Savings Details', metric_savings_modal_desc:'How your net savings for {month} were calculated',
+  th_category:'Category', th_amount:'Amount', th_pct:'%',
+  savings_calc_income:'Income', savings_calc_spent:'Spent', savings_calc_result:'Net Savings',
+  no_income_set:'No income set for this month yet.',
   budget_progress:'Budget Progress', financial_health:'Financial Health',
   score_msg_great:'Great job! Keep managing your spending.',
   score_msg_good:'You can improve by reducing discretionary spending.',
@@ -52,7 +58,7 @@ en: {
   receipt_fallback_name:'Receipt',
   expense_name:'Expense Name', expense_name_ph:'e.g. Starbucks coffee',
   amount_label:'Amount (¥)', amount_ph:'e.g. 1500', date_label:'Date',
-  note_label:'Note (optional)', note_ph:'Any note...', category_label:'Category',
+  note_label:'Note (optional)', note_ph:'Any note...', category_label:'Category', time_label:'Time',
   save_expense_btn:'➕ Save Expense', monthly_income_label:'Monthly Income', update_income_btn:'Update Income',
   income_month_hint:'This only sets income for the month shown above — past and future months keep their own values.',
 
@@ -64,7 +70,7 @@ en: {
   confirm_delete_expense:'Delete this expense?', edit_expense_title:'Edit Expense', save_changes_btn:'💾 Save Changes',
 
   analytics_title:'Analytics', analytics_subtitle:'Spending breakdown & trends',
-  export_excel_btn:'⬇️ Export Excel', no_export_alert:'No expenses to export yet.',
+  export_excel_btn:'⬇️ Export Excel', export_pdf_btn:'⬇️ Export PDF', no_export_alert:'No expenses to export yet.',
   category_breakdown:'Category Breakdown', legend_title:'Legend', no_data_month:'No data this month',
   trend_6mo:'6-Month Trend', all_transactions:'All Transactions',
 
@@ -133,6 +139,25 @@ en: {
   create_account_btn:'Create Account', already_account:'Already have an account?',
   err_both_fields:'Please enter both email and password.', err_all_fields:'All fields are required.',
   err_password_mismatch:'❌ Passwords do not match.', success_account_created:'✅ Account created! Redirecting...',
+
+  /* Forgot password (login page) */
+  forgot_password_link:'Forgot password?', back_to_login:'Back to login',
+  forgot_password_title:'Reset your password', forgot_password_subtitle:'Enter your account email and choose a new password.',
+  new_password_label:'New Password', confirm_new_password_label:'Confirm New Password',
+  reset_password_btn:'Reset Password', success_password_reset:'✅ Password reset! You can log in now.',
+  err_no_account_email:'No account found with that email.',
+
+  /* Account settings (main app) */
+  settings_account_title:'Account Settings',
+  settings_photo:'Profile Photo', settings_change_photo:'Change Photo', settings_remove_photo:'Remove photo',
+  settings_username:'Username', settings_save_name:'Save Name',
+  settings_change_password:'Change Password', current_password_label:'Current Password',
+  settings_save_password:'Update Password',
+  toast_photo_updated:'Profile photo updated', toast_photo_removed:'Profile photo removed',
+  toast_photo_update_failed:'Could not update photo', toast_invalid_image:'Please choose an image file',
+  toast_name_required:'Name cannot be empty', toast_profile_updated:'Profile updated',
+  toast_profile_update_failed:'Could not update profile', toast_password_changed:'✅ Password updated successfully.',
+  err_password_too_short:'Password must be at least 6 characters.',
 },
 
 /* ── JAPANESE ── */
@@ -151,6 +176,12 @@ ja: {
   alltime_modal_title:'月別内訳',
   alltime_modal_since:'{date}から', alltime_modal_total:'累計合計',
   th_month:'月', th_income:'収入', th_spent:'支出', th_net:'純額',
+  metric_income_modal_title:'月収の詳細', metric_income_modal_desc:'{month}に設定された収入',
+  metric_spent_modal_title:'支出の詳細', metric_spent_modal_desc:'{month}のカテゴリー別内訳',
+  metric_savings_modal_title:'純貯蓄の詳細', metric_savings_modal_desc:'{month}の純貯蓄の計算方法',
+  th_category:'カテゴリー', th_amount:'金額', th_pct:'割合',
+  savings_calc_income:'収入', savings_calc_spent:'支出', savings_calc_result:'純貯蓄',
+  no_income_set:'この月の収入はまだ設定されていません。',
   budget_progress:'予算の進捗', financial_health:'家計の健全度',
   score_msg_great:'素晴らしい！この調子で支出を管理しましょう。',
   score_msg_good:'不要な支出を減らすことでさらに改善できます。',
@@ -162,7 +193,7 @@ ja: {
   add_title:'支出を追加', add_subtitle:'新しい支出を記録', expense_details:'支出の詳細',
   expense_name:'支出名', expense_name_ph:'例：スターバックスのコーヒー',
   amount_label:'金額（¥）', amount_ph:'例：1500', date_label:'日付',
-  note_label:'メモ（任意）', note_ph:'メモを入力...', category_label:'カテゴリー',
+  note_label:'メモ（任意）', note_ph:'メモを入力...', category_label:'カテゴリー', time_label:'時刻',
   save_expense_btn:'➕ 支出を保存', monthly_income_label:'月収', update_income_btn:'収入を更新',
   income_month_hint:'これは上に表示されている月の収入のみを設定します。過去や未来の月には影響しません。',
 
@@ -174,7 +205,7 @@ ja: {
   confirm_delete_expense:'この支出を削除しますか？', edit_expense_title:'支出を編集', save_changes_btn:'💾 変更を保存',
 
   analytics_title:'分析', analytics_subtitle:'支出の内訳とトレンド',
-  export_excel_btn:'⬇️ Excelに書き出す', no_export_alert:'書き出せる支出がまだありません。',
+  export_excel_btn:'⬇️ Excelに書き出す', export_pdf_btn:'⬇️ PDFに書き出す', no_export_alert:'書き出せる支出がまだありません。',
   category_breakdown:'カテゴリー別内訳', legend_title:'凡例', no_data_month:'今月のデータはありません',
   trend_6mo:'過去6ヶ月の推移', all_transactions:'すべての取引',
 
@@ -232,6 +263,25 @@ ja: {
   create_account_btn:'アカウントを作成', already_account:'すでにアカウントをお持ちですか？',
   err_both_fields:'メールアドレスとパスワードの両方を入力してください。', err_all_fields:'すべての項目を入力してください。',
   err_password_mismatch:'❌ パスワードが一致しません。', success_account_created:'✅ アカウントを作成しました！移動中...',
+
+  /* Forgot password (login page) */
+  forgot_password_link:'パスワードをお忘れですか？', back_to_login:'ログインに戻る',
+  forgot_password_title:'パスワードを再設定', forgot_password_subtitle:'登録済みのメールアドレスを入力し、新しいパスワードを設定してください。',
+  new_password_label:'新しいパスワード', confirm_new_password_label:'新しいパスワード（確認）',
+  reset_password_btn:'パスワードを再設定', success_password_reset:'✅ パスワードを再設定しました！ログインできます。',
+  err_no_account_email:'そのメールアドレスのアカウントが見つかりません。',
+
+  /* Account settings (main app) */
+  settings_account_title:'アカウント設定',
+  settings_photo:'プロフィール写真', settings_change_photo:'写真を変更', settings_remove_photo:'写真を削除',
+  settings_username:'ユーザー名', settings_save_name:'名前を保存',
+  settings_change_password:'パスワードを変更', current_password_label:'現在のパスワード',
+  settings_save_password:'パスワードを更新',
+  toast_photo_updated:'プロフィール写真を更新しました', toast_photo_removed:'プロフィール写真を削除しました',
+  toast_photo_update_failed:'写真を更新できませんでした', toast_invalid_image:'画像ファイルを選択してください',
+  toast_name_required:'名前を空にはできません', toast_profile_updated:'プロフィールを更新しました',
+  toast_profile_update_failed:'プロフィールを更新できませんでした', toast_password_changed:'✅ パスワードを更新しました。',
+  err_password_too_short:'パスワードは6文字以上にしてください。',
 },
 
 /* ── NEPALI ── */
@@ -250,6 +300,12 @@ ne: {
   alltime_modal_title:'महिना अनुसार विवरण',
   alltime_modal_since:'{date} देखि', alltime_modal_total:'सम्पूर्ण जम्मा',
   th_month:'महिना', th_income:'आम्दानी', th_spent:'खर्च', th_net:'खुद',
+  metric_income_modal_title:'मासिक आम्दानी विवरण', metric_income_modal_desc:'{month} को लागि तपाईंको सेट गरिएको आम्दानी',
+  metric_spent_modal_title:'खर्च विवरण', metric_spent_modal_desc:'{month} को श्रेणी अनुसार विवरण',
+  metric_savings_modal_title:'खुद बचत विवरण', metric_savings_modal_desc:'{month} को खुद बचत कसरी गणना गरियो',
+  th_category:'श्रेणी', th_amount:'रकम', th_pct:'%',
+  savings_calc_income:'आम्दानी', savings_calc_spent:'खर्च', savings_calc_result:'खुद बचत',
+  no_income_set:'यस महिनाको लागि आम्दानी अझै सेट गरिएको छैन।',
   budget_progress:'बजेट प्रगति', financial_health:'आर्थिक स्वास्थ्य',
   score_msg_great:'शाबास! यसरी नै खर्च व्यवस्थापन गर्नुहोस्।',
   score_msg_good:'अनावश्यक खर्च घटाएर तपाईं अझ राम्रो गर्न सक्नुहुन्छ।',
@@ -261,7 +317,7 @@ ne: {
   add_title:'खर्च थप्नुहोस्', add_subtitle:'नयाँ खर्च रेकर्ड गर्नुहोस्', expense_details:'खर्चको विवरण',
   expense_name:'खर्चको नाम', expense_name_ph:'जस्तै: स्टारबक्स कफी',
   amount_label:'रकम (¥)', amount_ph:'जस्तै: 1500', date_label:'मिति',
-  note_label:'टिप्पणी (वैकल्पिक)', note_ph:'कुनै टिप्पणी...', category_label:'श्रेणी',
+  note_label:'टिप्पणी (वैकल्पिक)', note_ph:'कुनै टिप्पणी...', category_label:'श्रेणी', time_label:'समय',
   save_expense_btn:'➕ खर्च सुरक्षित गर्नुहोस्', monthly_income_label:'मासिक आम्दानी', update_income_btn:'आम्दानी अपडेट गर्नुहोस्',
   income_month_hint:'यसले माथि देखाइएको महिनाको मात्र आम्दानी सेट गर्छ — विगत र आगामी महिनाहरूको आम्दानी छुट्टै रहन्छ।',
 
@@ -273,7 +329,7 @@ ne: {
   confirm_delete_expense:'यो खर्च मेटाउने हो?', edit_expense_title:'खर्च सम्पादन गर्नुहोस्', save_changes_btn:'💾 परिवर्तनहरू सुरक्षित गर्नुहोस्',
 
   analytics_title:'विश्लेषण', analytics_subtitle:'खर्चको विवरण र प्रवृत्ति',
-  export_excel_btn:'⬇️ Excel मा निर्यात गर्नुहोस्', no_export_alert:'निर्यात गर्न कुनै खर्च छैन।',
+  export_excel_btn:'⬇️ Excel मा निर्यात गर्नुहोस्', export_pdf_btn:'⬇️ PDF मा निर्यात गर्नुहोस्', no_export_alert:'निर्यात गर्न कुनै खर्च छैन।',
   category_breakdown:'श्रेणी अनुसार विवरण', legend_title:'लिजेन्ड', no_data_month:'यस महिना कुनै डाटा छैन',
   trend_6mo:'६ महिनाको प्रवृत्ति', all_transactions:'सबै कारोबारहरू',
 
@@ -331,6 +387,25 @@ ne: {
   create_account_btn:'खाता बनाउनुहोस्', already_account:'पहिले नै खाता छ?',
   err_both_fields:'कृपया इमेल र पासवर्ड दुवै लेख्नुहोस्।', err_all_fields:'सबै फिल्डहरू आवश्यक छन्।',
   err_password_mismatch:'❌ पासवर्ड मेल खाएन।', success_account_created:'✅ खाता बनियो! रिडाइरेक्ट हुँदैछ...',
+
+  /* Forgot password (login page) */
+  forgot_password_link:'पासवर्ड बिर्सनुभयो?', back_to_login:'लगइनमा फर्कनुहोस्',
+  forgot_password_title:'पासवर्ड रिसेट गर्नुहोस्', forgot_password_subtitle:'आफ्नो खाताको इमेल राखी नयाँ पासवर्ड सेट गर्नुहोस्।',
+  new_password_label:'नयाँ पासवर्ड', confirm_new_password_label:'नयाँ पासवर्ड पुष्टि गर्नुहोस्',
+  reset_password_btn:'पासवर्ड रिसेट गर्नुहोस्', success_password_reset:'✅ पासवर्ड रिसेट भयो! अब लगइन गर्न सक्नुहुन्छ।',
+  err_no_account_email:'त्यो इमेलको खाता फेला परेन।',
+
+  /* Account settings (main app) */
+  settings_account_title:'खाता सेटिङ',
+  settings_photo:'प्रोफाइल फोटो', settings_change_photo:'फोटो बदल्नुहोस्', settings_remove_photo:'फोटो हटाउनुहोस्',
+  settings_username:'प्रयोगकर्ता नाम', settings_save_name:'नाम सेभ गर्नुहोस्',
+  settings_change_password:'पासवर्ड परिवर्तन गर्नुहोस्', current_password_label:'हालको पासवर्ड',
+  settings_save_password:'पासवर्ड अपडेट गर्नुहोस्',
+  toast_photo_updated:'प्रोफाइल फोटो अपडेट भयो', toast_photo_removed:'प्रोफाइल फोटो हटाइयो',
+  toast_photo_update_failed:'फोटो अपडेट गर्न सकिएन', toast_invalid_image:'कृपया एउटा तस्बिर फाइल छान्नुहोस्',
+  toast_name_required:'नाम खाली हुन सक्दैन', toast_profile_updated:'प्रोफाइल अपडेट भयो',
+  toast_profile_update_failed:'प्रोफाइल अपडेट गर्न सकिएन', toast_password_changed:'✅ पासवर्ड सफलतापूर्वक अपडेट भयो।',
+  err_password_too_short:'पासवर्ड कम्तीमा ६ अक्षरको हुनुपर्छ।',
 },
 
 /* ── HINDI ── */
@@ -349,6 +424,12 @@ hi: {
   alltime_modal_title:'महीने-दर-महीना विवरण',
   alltime_modal_since:'{date} से', alltime_modal_total:'कुल योग',
   th_month:'महीना', th_income:'आय', th_spent:'खर्च', th_net:'शुद्ध',
+  metric_income_modal_title:'मासिक आय विवरण', metric_income_modal_desc:'{month} के लिए आपकी निर्धारित आय',
+  metric_spent_modal_title:'खर्च विवरण', metric_spent_modal_desc:'{month} के लिए श्रेणीवार विवरण',
+  metric_savings_modal_title:'शुद्ध बचत विवरण', metric_savings_modal_desc:'{month} की शुद्ध बचत की गणना कैसे हुई',
+  th_category:'श्रेणी', th_amount:'राशि', th_pct:'%',
+  savings_calc_income:'आय', savings_calc_spent:'खर्च', savings_calc_result:'शुद्ध बचत',
+  no_income_set:'इस महीने के लिए अभी तक आय निर्धारित नहीं की गई है।',
   budget_progress:'बजट प्रगति', financial_health:'वित्तीय स्वास्थ्य',
   score_msg_great:'शानदार! अपने खर्च को इसी तरह प्रबंधित करते रहें।',
   score_msg_good:'गैर-ज़रूरी खर्च घटाकर आप और बेहतर कर सकते हैं।',
@@ -360,7 +441,7 @@ hi: {
   add_title:'खर्च जोड़ें', add_subtitle:'नया खर्च दर्ज करें', expense_details:'खर्च का विवरण',
   expense_name:'खर्च का नाम', expense_name_ph:'जैसे: स्टारबक्स कॉफ़ी',
   amount_label:'राशि (¥)', amount_ph:'जैसे: 1500', date_label:'तारीख',
-  note_label:'टिप्पणी (वैकल्पिक)', note_ph:'कोई टिप्पणी...', category_label:'श्रेणी',
+  note_label:'टिप्पणी (वैकल्पिक)', note_ph:'कोई टिप्पणी...', category_label:'श्रेणी', time_label:'समय',
   save_expense_btn:'➕ खर्च सहेजें', monthly_income_label:'मासिक आय', update_income_btn:'आय अपडेट करें',
   income_month_hint:'यह केवल ऊपर दिखाए गए महीने की आय सेट करता है — पिछले और आगामी महीनों की आय अलग-अलग बनी रहती है।',
 
@@ -372,7 +453,7 @@ hi: {
   confirm_delete_expense:'यह खर्च हटाएं?', edit_expense_title:'खर्च संपादित करें', save_changes_btn:'💾 परिवर्तन सहेजें',
 
   analytics_title:'विश्लेषण', analytics_subtitle:'खर्च का विवरण और रुझान',
-  export_excel_btn:'⬇️ Excel में निर्यात करें', no_export_alert:'अभी निर्यात करने के लिए कोई खर्च नहीं है।',
+  export_excel_btn:'⬇️ Excel में निर्यात करें', export_pdf_btn:'⬇️ PDF में निर्यात करें', no_export_alert:'अभी निर्यात करने के लिए कोई खर्च नहीं है।',
   category_breakdown:'श्रेणीवार विवरण', legend_title:'लीजेंड', no_data_month:'इस महीने कोई डेटा नहीं',
   trend_6mo:'6-माह का रुझान', all_transactions:'सभी लेन-देन',
 
@@ -430,6 +511,25 @@ hi: {
   create_account_btn:'खाता बनाएं', already_account:'पहले से खाता है?',
   err_both_fields:'कृपया ईमेल और पासवर्ड दोनों दर्ज करें।', err_all_fields:'सभी फ़ील्ड आवश्यक हैं।',
   err_password_mismatch:'❌ पासवर्ड मेल नहीं खाते।', success_account_created:'✅ खाता बन गया! रीडायरेक्ट हो रहा है...',
+
+  /* Forgot password (login page) */
+  forgot_password_link:'पासवर्ड भूल गए?', back_to_login:'लॉगिन पर वापस जाएं',
+  forgot_password_title:'पासवर्ड रीसेट करें', forgot_password_subtitle:'अपना खाता ईमेल दर्ज करें और नया पासवर्ड चुनें।',
+  new_password_label:'नया पासवर्ड', confirm_new_password_label:'नए पासवर्ड की पुष्टि करें',
+  reset_password_btn:'पासवर्ड रीसेट करें', success_password_reset:'✅ पासवर्ड रीसेट हो गया! अब आप लॉगिन कर सकते हैं।',
+  err_no_account_email:'उस ईमेल से कोई खाता नहीं मिला।',
+
+  /* Account settings (main app) */
+  settings_account_title:'खाता सेटिंग्स',
+  settings_photo:'प्रोफ़ाइल फ़ोटो', settings_change_photo:'फ़ोटो बदलें', settings_remove_photo:'फ़ोटो हटाएं',
+  settings_username:'उपयोगकर्ता नाम', settings_save_name:'नाम सेव करें',
+  settings_change_password:'पासवर्ड बदलें', current_password_label:'वर्तमान पासवर्ड',
+  settings_save_password:'पासवर्ड अपडेट करें',
+  toast_photo_updated:'प्रोफ़ाइल फ़ोटो अपडेट हुई', toast_photo_removed:'प्रोफ़ाइल फ़ोटो हटाई गई',
+  toast_photo_update_failed:'फ़ोटो अपडेट नहीं हो सकी', toast_invalid_image:'कृपया एक इमेज फ़ाइल चुनें',
+  toast_name_required:'नाम खाली नहीं हो सकता', toast_profile_updated:'प्रोफ़ाइल अपडेट हुई',
+  toast_profile_update_failed:'प्रोफ़ाइल अपडेट नहीं हो सकी', toast_password_changed:'✅ पासवर्ड सफलतापूर्वक अपडेट हुआ।',
+  err_password_too_short:'पासवर्ड कम से कम 6 अक्षरों का होना चाहिए।',
 },
 
 /* ── SPANISH ── */
@@ -448,6 +548,12 @@ es: {
   alltime_modal_title:'Desglose Mes a Mes',
   alltime_modal_since:'Desde {date}', alltime_modal_total:'Total histórico',
   th_month:'Mes', th_income:'Ingreso', th_spent:'Gastado', th_net:'Neto',
+  metric_income_modal_title:'Detalles del ingreso mensual', metric_income_modal_desc:'Tu ingreso establecido para {month}',
+  metric_spent_modal_title:'Detalles del gasto', metric_spent_modal_desc:'Desglose por categoría de {month}',
+  metric_savings_modal_title:'Detalles del ahorro neto', metric_savings_modal_desc:'Cómo se calculó tu ahorro neto de {month}',
+  th_category:'Categoría', th_amount:'Monto', th_pct:'%',
+  savings_calc_income:'Ingreso', savings_calc_spent:'Gastado', savings_calc_result:'Ahorro neto',
+  no_income_set:'Aún no se ha establecido un ingreso para este mes.',
   budget_progress:'Progreso del presupuesto', financial_health:'Salud financiera',
   score_msg_great:'¡Buen trabajo! Sigue gestionando tus gastos así.',
   score_msg_good:'Puedes mejorar reduciendo los gastos discrecionales.',
@@ -459,7 +565,7 @@ es: {
   add_title:'Añadir gasto', add_subtitle:'Registra un nuevo gasto', expense_details:'Detalles del gasto',
   expense_name:'Nombre del gasto', expense_name_ph:'ej. Café Starbucks',
   amount_label:'Monto (¥)', amount_ph:'ej. 1500', date_label:'Fecha',
-  note_label:'Nota (opcional)', note_ph:'Alguna nota...', category_label:'Categoría',
+  note_label:'Nota (opcional)', note_ph:'Alguna nota...', category_label:'Categoría', time_label:'Hora',
   save_expense_btn:'➕ Guardar gasto', monthly_income_label:'Ingreso mensual', update_income_btn:'Actualizar ingreso',
   income_month_hint:'Esto solo establece el ingreso del mes mostrado arriba — los meses pasados y futuros mantienen sus propios valores.',
 
@@ -471,7 +577,7 @@ es: {
   confirm_delete_expense:'¿Eliminar este gasto?', edit_expense_title:'Editar gasto', save_changes_btn:'💾 Guardar cambios',
 
   analytics_title:'Analítica', analytics_subtitle:'Desglose de gastos y tendencias',
-  export_excel_btn:'⬇️ Exportar a Excel', no_export_alert:'Aún no hay gastos para exportar.',
+  export_excel_btn:'⬇️ Exportar a Excel', export_pdf_btn:'⬇️ Exportar a PDF', no_export_alert:'Aún no hay gastos para exportar.',
   category_breakdown:'Desglose por categoría', legend_title:'Leyenda', no_data_month:'Sin datos este mes',
   trend_6mo:'Tendencia de 6 meses', all_transactions:'Todas las transacciones',
 
@@ -529,6 +635,25 @@ es: {
   create_account_btn:'Crear cuenta', already_account:'¿Ya tienes cuenta?',
   err_both_fields:'Por favor ingresa correo y contraseña.', err_all_fields:'Todos los campos son obligatorios.',
   err_password_mismatch:'❌ Las contraseñas no coinciden.', success_account_created:'✅ ¡Cuenta creada! Redirigiendo...',
+
+  /* Forgot password (login page) */
+  forgot_password_link:'¿Olvidaste tu contraseña?', back_to_login:'Volver al inicio de sesión',
+  forgot_password_title:'Restablece tu contraseña', forgot_password_subtitle:'Ingresa el correo de tu cuenta y elige una nueva contraseña.',
+  new_password_label:'Nueva contraseña', confirm_new_password_label:'Confirmar nueva contraseña',
+  reset_password_btn:'Restablecer contraseña', success_password_reset:'✅ ¡Contraseña restablecida! Ya puedes iniciar sesión.',
+  err_no_account_email:'No se encontró ninguna cuenta con ese correo.',
+
+  /* Account settings (main app) */
+  settings_account_title:'Configuración de la cuenta',
+  settings_photo:'Foto de perfil', settings_change_photo:'Cambiar foto', settings_remove_photo:'Eliminar foto',
+  settings_username:'Nombre de usuario', settings_save_name:'Guardar nombre',
+  settings_change_password:'Cambiar contraseña', current_password_label:'Contraseña actual',
+  settings_save_password:'Actualizar contraseña',
+  toast_photo_updated:'Foto de perfil actualizada', toast_photo_removed:'Foto de perfil eliminada',
+  toast_photo_update_failed:'No se pudo actualizar la foto', toast_invalid_image:'Selecciona un archivo de imagen',
+  toast_name_required:'El nombre no puede estar vacío', toast_profile_updated:'Perfil actualizado',
+  toast_profile_update_failed:'No se pudo actualizar el perfil', toast_password_changed:'✅ Contraseña actualizada correctamente.',
+  err_password_too_short:'La contraseña debe tener al menos 6 caracteres.',
 },
 
 /* ── CHINESE (SIMPLIFIED) ── */
@@ -547,6 +672,12 @@ zh: {
   alltime_modal_title:'按月明细',
   alltime_modal_since:'自 {date} 起', alltime_modal_total:'累计总额',
   th_month:'月份', th_income:'收入', th_spent:'支出', th_net:'净额',
+  metric_income_modal_title:'月收入详情', metric_income_modal_desc:'{month} 设定的收入',
+  metric_spent_modal_title:'支出详情', metric_spent_modal_desc:'{month} 的类别细分',
+  metric_savings_modal_title:'净储蓄详情', metric_savings_modal_desc:'{month} 净储蓄的计算方式',
+  th_category:'类别', th_amount:'金额', th_pct:'占比',
+  savings_calc_income:'收入', savings_calc_spent:'支出', savings_calc_result:'净储蓄',
+  no_income_set:'本月尚未设置收入。',
   budget_progress:'预算进度', financial_health:'财务健康度',
   score_msg_great:'做得好！继续保持良好的消费习惯。',
   score_msg_good:'减少非必要支出可以让你做得更好。',
@@ -558,7 +689,7 @@ zh: {
   add_title:'添加支出', add_subtitle:'记录一笔新支出', expense_details:'支出详情',
   expense_name:'支出名称', expense_name_ph:'例如：星巴克咖啡',
   amount_label:'金额 (¥)', amount_ph:'例如：1500', date_label:'日期',
-  note_label:'备注（可选）', note_ph:'添加备注...', category_label:'类别',
+  note_label:'备注（可选）', note_ph:'添加备注...', category_label:'类别', time_label:'时间',
   save_expense_btn:'➕ 保存支出', monthly_income_label:'月收入', update_income_btn:'更新收入',
   income_month_hint:'此设置仅适用于上方显示的月份 — 过去和未来的月份将保留各自的收入数值。',
 
@@ -570,7 +701,7 @@ zh: {
   confirm_delete_expense:'删除此支出？', edit_expense_title:'编辑支出', save_changes_btn:'💾 保存更改',
 
   analytics_title:'分析', analytics_subtitle:'支出细分与趋势',
-  export_excel_btn:'⬇️ 导出 Excel', no_export_alert:'暂无可导出的支出。',
+  export_excel_btn:'⬇️ 导出 Excel', export_pdf_btn:'⬇️ 导出 PDF', no_export_alert:'暂无可导出的支出。',
   category_breakdown:'类别细分', legend_title:'图例', no_data_month:'本月暂无数据',
   trend_6mo:'6 个月趋势', all_transactions:'所有交易',
 
@@ -628,6 +759,25 @@ zh: {
   create_account_btn:'创建账号', already_account:'已有账号？',
   err_both_fields:'请输入邮箱和密码。', err_all_fields:'所有字段均为必填项。',
   err_password_mismatch:'❌ 两次输入的密码不一致。', success_account_created:'✅ 账号已创建！正在跳转...',
+
+  /* Forgot password (login page) */
+  forgot_password_link:'忘记密码？', back_to_login:'返回登录',
+  forgot_password_title:'重置密码', forgot_password_subtitle:'输入您账号的邮箱并设置新密码。',
+  new_password_label:'新密码', confirm_new_password_label:'确认新密码',
+  reset_password_btn:'重置密码', success_password_reset:'✅ 密码已重置！现在可以登录了。',
+  err_no_account_email:'未找到使用该邮箱的账号。',
+
+  /* Account settings (main app) */
+  settings_account_title:'账户设置',
+  settings_photo:'头像', settings_change_photo:'更换头像', settings_remove_photo:'移除头像',
+  settings_username:'用户名', settings_save_name:'保存姓名',
+  settings_change_password:'修改密码', current_password_label:'当前密码',
+  settings_save_password:'更新密码',
+  toast_photo_updated:'头像已更新', toast_photo_removed:'头像已移除',
+  toast_photo_update_failed:'头像更新失败', toast_invalid_image:'请选择一个图片文件',
+  toast_name_required:'姓名不能为空', toast_profile_updated:'资料已更新',
+  toast_profile_update_failed:'资料更新失败', toast_password_changed:'✅ 密码已成功更新。',
+  err_password_too_short:'密码至少需要6个字符。',
 },
 
 };

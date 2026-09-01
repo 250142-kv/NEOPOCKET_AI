@@ -53,13 +53,33 @@ body::before {
   z-index: 0;
 }
 
+/* Faint brand watermark, sits behind all content, never affects readability */
+body::after {
+  content: '';
+  position: fixed;
+  right: -4%;
+  bottom: -6%;
+  width: 760px;
+  height: 760px;
+  background-image: url('logo-watermark.png');
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center;
+  pointer-events: none;
+  z-index: 0;
+}
+
 /* ── Sidebar ── */
 .sidebar {
   position: fixed;
   top: 0; left: 0;
   width: var(--sidebar-w);
   height: 100vh;
-  background: rgba(6,11,24,0.95);
+  background-color: rgba(6,11,24,0.95);
+  background-image: url('logo-watermark.png');
+  background-repeat: no-repeat;
+  background-position: center 80%;
+  background-size: 210% auto;
   border-right: 1px solid var(--border);
   backdrop-filter: blur(20px);
   display: flex;
@@ -78,10 +98,20 @@ body::before {
 }
 .logo-icon {
   width: 40px; height: 40px;
-  background: var(--grad-blue);
   border-radius: 12px;
   display: flex; align-items: center; justify-content: center;
   font-size: 20px; font-weight: 700; color: #fff;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.logo-icon img {
+  width: 100%; height: 100%;
+  object-fit: contain;
+}
+.mobile-logo-icon {
+  width: 28px; height: 28px;
+  object-fit: contain;
+  margin: 0 8px;
 }
 .logo-name { font-size: 15px; font-weight: 700; color: var(--text-primary); letter-spacing: 1px; }
 .logo-tagline { font-size: 10px; color: var(--accent-blue); letter-spacing: 2px; text-transform: uppercase; }
@@ -137,6 +167,19 @@ body::before {
   border-top: 1px solid var(--border);
   margin-top: auto;
 }
+.sidebar-user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+  border-radius: 10px;
+  padding: 4px 6px;
+  margin: -4px -6px;
+  transition: background 0.15s;
+}
+.sidebar-user-info:hover { background: var(--bg-card-hover); }
 .user-avatar {
   width: 36px; height: 36px;
   border-radius: 50%;
@@ -144,8 +187,10 @@ body::before {
   display: flex; align-items: center; justify-content: center;
   font-size: 12px; font-weight: 700; color: #fff;
   flex-shrink: 0;
+  overflow: hidden;
 }
-.user-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.user-name { font-size: 13px; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .user-plan { font-size: 10px; color: var(--accent-teal); letter-spacing: 1px; text-transform: uppercase; }
 
 /* ── Mobile header ── */
@@ -620,6 +665,53 @@ body::before {
   padding-right: 4px;
 }
 
+/* ── Account settings modal ── */
+.settings-section-title {
+  font-size: 12px; font-weight: 700; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 1px;
+  margin: 22px 0 12px;
+}
+.settings-section-title:first-child { margin-top: 0; }
+.avatar-uploader {
+  display: flex; align-items: center; gap: 16px;
+}
+.avatar-uploader-preview {
+  width: 72px; height: 72px; border-radius: 50%;
+  background: var(--grad-purple, linear-gradient(135deg,#667eea,#764ba2));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; font-weight: 700; color: #fff;
+  overflow: hidden; flex-shrink: 0;
+  border: 2px solid var(--border);
+}
+.avatar-uploader-preview img { width: 100%; height: 100%; object-fit: cover; }
+.avatar-uploader-actions { display: flex; flex-direction: column; gap: 8px; }
+.avatar-uploader-actions .btn-secondary,
+.avatar-uploader-actions .btn-icon-text {
+  width: auto; padding: 7px 14px; font-size: 12px;
+}
+.btn-text-danger {
+  background: none; border: none; color: var(--accent-red);
+  font-size: 12px; cursor: pointer; text-align: left; padding: 0;
+}
+.btn-text-danger:hover { text-decoration: underline; }
+.auth-error {
+  background: rgba(252,129,129,0.12);
+  border: 1px solid rgba(252,129,129,0.4);
+  color: #fc8181;
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 12px;
+}
+.auth-success {
+  background: rgba(104,211,145,0.12);
+  border: 1px solid rgba(104,211,145,0.4);
+  color: #68d391;
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 12px;
+}
+
+
 /* ── Toast ── */
 .toast {
   position: fixed;
@@ -744,6 +836,23 @@ body::before {
   z-index:0;
 }
 
+/* Faint brand watermark on the login screen, sits behind the login box */
+.login-watermark{
+  position:absolute;
+  right:-8%;
+  bottom:-10%;
+  width:560px;
+  height:560px;
+  max-width:70vw;
+  max-height:70vw;
+  background-image:url('logo-watermark.png');
+  background-repeat:no-repeat;
+  background-size:contain;
+  background-position:center;
+  pointer-events:none;
+  z-index:0;
+}
+
 @keyframes bgDrift{
   0%   { transform: scale(1)   translate(0,0); }
   100% { transform: scale(1.08) translate(-1.5%, 1.5%); }
@@ -774,16 +883,21 @@ body::before {
 }
 
 .login-header .logo{
-  width:50px;
-  height:50px;
+  width:64px;
+  height:64px;
   margin:auto;
-  background:#667eea;
-  border-radius:12px;
+  border-radius:14px;
   display:flex;
   justify-content:center;
   align-items:center;
   font-weight:bold;
   font-size:22px;
+  overflow:hidden;
+}
+.login-header .logo img{
+  width:100%;
+  height:100%;
+  object-fit:contain;
 }
 
 .login-header h1{

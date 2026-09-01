@@ -11,6 +11,7 @@
 <body class="login-body">
 
   <div class="money-rain" id="moneyRain"></div>
+  <div class="login-watermark"></div>
 
   <div class="login-container">
     <div class="login-box">
@@ -20,7 +21,7 @@
       </div>
 
       <div class="login-header">
-        <div class="logo">N</div>
+        <div class="logo"><img src="logo.png" alt="NEOPOCKET AI" /></div>
         <h1 data-i18n="login_app_name">NEOPOCKET AI</h1>
         <p data-i18n="login_tagline">Smart Finance Assistant</p>
       </div>
@@ -49,7 +50,45 @@
         <button type="submit" class="login-btn" data-i18n="login_btn">Login</button>
 
         <p class="signup-text">
+          <a href="#" onclick="showForgotPassword(); return false;" data-i18n="forgot_password_link">Forgot password?</a>
+        </p>
+
+        <p class="signup-text">
           <span data-i18n="no_account">No account?</span> <a href="#" onclick="switchTab('signup'); return false;" data-i18n="signup_free">Sign up free</a>
+        </p>
+
+      </form>
+
+      <!-- FORGOT PASSWORD FORM -->
+      <form id="forgotForm" class="auth-form" style="display:none;" onsubmit="handleForgotPassword(event)">
+
+        <div style="text-align:center;margin-bottom:16px;">
+          <div style="font-size:15px;font-weight:700;margin-bottom:4px;" data-i18n="forgot_password_title">Reset your password</div>
+          <div style="font-size:12px;color:#94a3b8;" data-i18n="forgot_password_subtitle">Enter your account email and choose a new password.</div>
+        </div>
+
+        <div class="input-group">
+          <label data-i18n="email_label">Email</label>
+          <input type="email" id="forgot-email" placeholder="Enter your email" data-i18n-placeholder="email_ph" required />
+        </div>
+
+        <div class="input-group">
+          <label data-i18n="new_password_label">New Password</label>
+          <input type="password" id="forgot-new-password" placeholder="Create a new password (min 6 chars)" data-i18n-placeholder="signup_password_ph" required minlength="6" />
+        </div>
+
+        <div class="input-group">
+          <label data-i18n="confirm_new_password_label">Confirm New Password</label>
+          <input type="password" id="forgot-confirm-password" placeholder="Repeat your new password" data-i18n-placeholder="confirm_password_ph" required />
+        </div>
+
+        <div id="forgot-error" class="auth-error" style="display:none;"></div>
+        <div id="forgot-success" class="auth-success" style="display:none;"></div>
+
+        <button type="submit" class="login-btn" data-i18n="reset_password_btn">Reset Password</button>
+
+        <p class="signup-text">
+          <a href="#" onclick="backToLogin(); return false;" data-i18n="back_to_login">Back to login</a>
         </p>
 
       </form>
@@ -168,11 +207,66 @@
     function switchTab(tab) {
       document.getElementById('loginForm').style.display  = tab === 'login'  ? '' : 'none';
       document.getElementById('signupForm').style.display = tab === 'signup' ? '' : 'none';
+      document.getElementById('forgotForm').style.display = 'none';
+      document.getElementById('tab-login').style.display  = '';
+      document.getElementById('tab-signup').style.display = '';
       document.getElementById('tab-login').classList.toggle('active',  tab === 'login');
       document.getElementById('tab-signup').classList.toggle('active', tab === 'signup');
       document.getElementById('login-error').style.display = 'none';
       document.getElementById('signup-error').style.display = 'none';
       document.getElementById('signup-success').style.display = 'none';
+    }
+
+    function showForgotPassword() {
+      document.getElementById('loginForm').style.display = 'none';
+      document.getElementById('signupForm').style.display = 'none';
+      document.getElementById('forgotForm').style.display = '';
+      document.querySelector('.auth-tabs').style.display = 'none';
+      document.getElementById('forgot-error').style.display = 'none';
+      document.getElementById('forgot-success').style.display = 'none';
+    }
+
+    function backToLogin() {
+      document.querySelector('.auth-tabs').style.display = '';
+      switchTab('login');
+    }
+
+    async function handleForgotPassword(e) {
+      e.preventDefault();
+      const email    = document.getElementById('forgot-email').value.trim().toLowerCase();
+      const pass     = document.getElementById('forgot-new-password').value;
+      const confirm  = document.getElementById('forgot-confirm-password').value;
+      const errEl    = document.getElementById('forgot-error');
+      const sucEl    = document.getElementById('forgot-success');
+
+      errEl.style.display = 'none';
+      sucEl.style.display = 'none';
+
+      if (!email || !pass) {
+        errEl.textContent = t('err_all_fields');
+        errEl.style.display = 'block';
+        return;
+      }
+      if (pass.length < 6) {
+        errEl.textContent = t('err_password_too_short');
+        errEl.style.display = 'block';
+        return;
+      }
+      if (pass !== confirm) {
+        errEl.textContent = t('err_password_mismatch');
+        errEl.style.display = 'block';
+        return;
+      }
+
+      try {
+        await apiRequest('forgot_password', { email, newPassword: pass });
+        sucEl.textContent = t('success_password_reset');
+        sucEl.style.display = 'block';
+        setTimeout(() => { backToLogin(); }, 1200);
+      } catch (err) {
+        errEl.textContent = '❌ ' + (err.message || 'Reset failed');
+        errEl.style.display = 'block';
+      }
     }
 
     function apiRequest(action, data = {}) {

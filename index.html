@@ -7,6 +7,8 @@
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   <script src="i18n.js"></script>
 </head>
 <body>
@@ -14,7 +16,7 @@
   <!-- ── SIDEBAR ── -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-logo">
-      <div class="logo-icon">N</div>
+      <div class="logo-icon"><img src="logo.png" alt="NEOPOCKET AI" /></div>
       <div>
         <div class="logo-name">NEOPOCKET</div>
         <div class="logo-tagline">AI Finance</div>
@@ -50,18 +52,21 @@
     </div>
 
     <div class="sidebar-user">
-      <div class="user-avatar">YT</div>
-      <div style="flex:1;">
-        <div class="user-name">Yamada Taro</div>
-        <div class="user-plan" data-i18n="sidebar_plan">Pro Member</div>
+      <div class="sidebar-user-info" onclick="openAccountSettingsModal()">
+        <div class="user-avatar">YT</div>
+        <div style="flex:1;min-width:0;">
+          <div class="user-name">Yamada Taro</div>
+          <div class="user-plan" data-i18n="sidebar_plan">Pro Member</div>
+        </div>
       </div>
-      <button onclick="handleLogout()" data-i18n-title="logout_title" title="Logout" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:18px;padding:4px;">⏻</button>
+      <button onclick="event.stopPropagation(); handleLogout()" data-i18n-title="logout_title" title="Logout" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:18px;padding:4px;flex-shrink:0;">⏻</button>
     </div>
   </aside>
 
   <!-- ── MOBILE TOP BAR ── -->
   <header class="mobile-header">
     <button class="hamburger" id="hamburger">&#9776;</button>
+    <img class="mobile-logo-icon" src="logo.png" alt="NEOPOCKET AI" />
     <span class="mobile-logo">NEOPOCKET AI</span>
   </header>
 

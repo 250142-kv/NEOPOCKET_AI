@@ -43,6 +43,15 @@ try {
         case 'signup':
             handleSignup($pdo, $body);
             break;
+        case 'forgot_password':
+            handleForgotPassword($pdo, $body);
+            break;
+        case 'change_password':
+            handleChangePassword($pdo, $body);
+            break;
+        case 'update_profile':
+            handleUpdateProfile($pdo, $body);
+            break;
         case 'logout':
             handleLogout();
             break;
@@ -175,6 +184,10 @@ SQL
     if (!$col) {
         $pdo->exec("ALTER TABLE users ADD COLUMN currency VARCHAR(8) NOT NULL DEFAULT 'JPY' AFTER income");
     }
+    $col = $pdo->query("SHOW COLUMNS FROM users LIKE 'avatar'")->fetch();
+    if (!$col) {
+        $pdo->exec('ALTER TABLE users ADD COLUMN avatar MEDIUMTEXT NULL AFTER password_hash');
+    }
 }
 
 function handleLogin(PDO $pdo, array $data): void
@@ -185,7 +198,7 @@ function handleLogin(PDO $pdo, array $data): void
         respondError('Email and password are required', 400);
     }
 
-    $stmt = $pdo->prepare('SELECT id, name, email, password_hash FROM users WHERE email = ? LIMIT 1');
+    $stmt = $pdo->prepare('SELECT id, name, email, password_hash, avatar FROM users WHERE email = ? LIMIT 1');
     $stmt->execute([$email]);
     $user = $stmt->fetch();
     if (!$user || !password_verify($password, $user['password_hash'])) {
@@ -193,7 +206,7 @@ function handleLogin(PDO $pdo, array $data): void
     }
 
     $_SESSION['user_id'] = (int)$user['id'];
-    respondJson(['success' => true, 'user' => ['name' => $user['name'], 'email' => $user['email']]]);
+    respondJson(['success' => true, 'user' => ['name' => $user['name'], 'email' => $user['email'], 'avatar' => $user['avatar']]]);
 }
 
 function handleSignup(PDO $pdo, array $data): void
@@ -219,7 +232,94 @@ function handleSignup(PDO $pdo, array $data): void
     $stmt->execute([$name, $email, $passwordHash]);
 
     $_SESSION['user_id'] = (int)$pdo->lastInsertId();
-    respondJson(['success' => true, 'user' => ['name' => $name, 'email' => $email]]);
+    respondJson(['success' => true, 'user' => ['name' => $name, 'email' => $email, 'avatar' => null]]);
+}
+
+function handleForgotPassword(PDO $pdo, array $data): void
+{
+    $email = trim(strtolower($data['email'] ?? ''));
+    $newPassword = $data['newPassword'] ?? '';
+
+    if (!$email || !$newPassword) {
+        respondError('Email and new password are required', 400);
+    }
+    if (strlen($newPassword) < 6) {
+        respondError('Password must be at least 6 characters', 400);
+    }
+
+    $stmt = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
+    $stmt->execute([$email]);
+    $user = $stmt->fetch();
+    if (!$user) {
+        respondError('No account found with that email', 404);
+    }
+
+    $hash = password_hash($newPassword, PASSWORD_DEFAULT);
+    $stmt = $pdo->prepare('UPDATE users SET password_hash = ? WHERE id = ?');
+    $stmt->execute([$hash, $user['id']]);
+
+    respondJson(['success' => true]);
+}
+
+function handleChangePassword(PDO $pdo, array $data): void
+{
+    $userId = getSessionUserId();
+    $current = $data['currentPassword'] ?? '';
+    $new = $data['newPassword'] ?? '';
+
+    if (!$current || !$new) {
+        respondError('Current and new password are required', 400);
+    }
+    if (strlen($new) < 6) {
+        respondError('New password must be at least 6 characters', 400);
+    }
+
+    $stmt = $pdo->prepare('SELECT password_hash FROM users WHERE id = ? LIMIT 1');
+    $stmt->execute([$userId]);
+    $user = $stmt->fetch();
+    if (!$user || !password_verify($current, $user['password_hash'])) {
+        respondError('Current password is incorrect', 401);
+    }
+
+    $hash = password_hash($new, PASSWORD_DEFAULT);
+    $stmt = $pdo->prepare('UPDATE users SET password_hash = ? WHERE id = ?');
+    $stmt->execute([$hash, $userId]);
+
+    respondJson(['success' => true]);
+}
+
+function handleUpdateProfile(PDO $pdo, array $data): void
+{
+    $userId = getSessionUserId();
+    $name = trim((string)($data['name'] ?? ''));
+    $avatarProvided = array_key_exists('avatar', $data);
+    $avatar = $avatarProvided ? $data['avatar'] : null;
+
+    if ($name === '') {
+        respondError('Name cannot be empty', 400);
+    }
+    if ($avatarProvided && $avatar !== null) {
+        if (!is_string($avatar) || !preg_match('/^data:image\/(png|jpe?g|webp);base64,/', $avatar)) {
+            respondError('Invalid image data', 400);
+        }
+        if (strlen($avatar) > 3000000) {
+            respondError('Image is too large', 400);
+        }
+    }
+
+    if ($avatarProvided) {
+        $stmt = $pdo->prepare('UPDATE users SET name = ?, avatar = ? WHERE id = ?');
+        $stmt->execute([$name, $avatar, $userId]);
+    } else {
+        $stmt = $pdo->prepare('UPDATE users SET name = ? WHERE id = ?');
+        $stmt->execute([$name, $userId]);
+    }
+
+    $stmt = $pdo->prepare('SELECT name, email, avatar FROM users WHERE id = ? LIMIT 1');
+    $stmt->execute([$userId]);
+    $user = $stmt->fetch();
+
+    respondJson(['success' => true, 'user' => ['name' => $user['name'], 'email' => $user['email'], 'avatar' => $user['avatar']]]);
 }
 
 function handleLogout(): void
@@ -239,7 +339,7 @@ function handleGetData(PDO $pdo): void
 {
     $userId = getSessionUserId();
 
-    $stmt = $pdo->prepare('SELECT id, name, email, income, currency FROM users WHERE id = ? LIMIT 1');
+    $stmt = $pdo->prepare('SELECT id, name, email, income, currency, avatar FROM users WHERE id = ? LIMIT 1');
     $stmt->execute([$userId]);
     $user = $stmt->fetch();
 
@@ -287,7 +387,7 @@ function handleGetData(PDO $pdo): void
 
     respondJson([
         'success' => true,
-        'user' => ['name' => $user['name'], 'email' => $user['email']],
+        'user' => ['name' => $user['name'], 'email' => $user['email'], 'avatar' => $user['avatar']],
         'income' => (float)$user['income'],
         'incomeByMonth' => $incomeByMonth,
         'currency' => $user['currency'] ?: 'JPY',

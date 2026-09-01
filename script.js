@@ -3,7 +3,7 @@
    Full app logic: routing, CRUD, charts, AI advisor
    ===================================================== */
 /* ── Auth guard & current user ── */
-let currentUser = { name: 'User', email: '' };
+let currentUser = { name: 'User', email: '', avatar: null };
 
 function apiRequest(action, data = {}) {
   return fetch(`api.php?action=${encodeURIComponent(action)}`, {
@@ -28,11 +28,9 @@ function updateSidebarUser() {
   const avatarEl = document.querySelector('.user-avatar');
   if (nameEl) nameEl.textContent = currentUser.name || 'User';
   if (avatarEl) {
-    const parts = (currentUser.name || 'User').trim().split(' ');
-    const initials = parts.length >= 2
-      ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-      : (currentUser.name || 'User').slice(0, 2).toUpperCase();
-    avatarEl.textContent = initials;
+    avatarEl.innerHTML = currentUser.avatar
+      ? `<img src="${currentUser.avatar}" alt="${escHTML(currentUser.name || 'User')}" />`
+      : getInitials(currentUser.name);
   }
 }
 
@@ -565,13 +563,13 @@ function renderDashboard() {
     </div>
 
     <div class="metric-grid">
-      <div class="metric-card" style="--grad: linear-gradient(135deg,#667eea,#764ba2);">
+      <div class="metric-card" style="--grad: linear-gradient(135deg,#667eea,#764ba2);cursor:pointer;" onclick="openIncomeDetailModal()">
         <span class="metric-icon">💰</span>
         <div class="metric-label">${t('metric_income')}</div>
         <div class="metric-value">${formatYen(monthIncome)}</div>
         <div class="metric-sub metric-neutral">${t('metric_income_sub')}</div>
       </div>
-      <div class="metric-card" style="--grad: linear-gradient(135deg,#f093fb,#f5576c);">
+      <div class="metric-card" style="--grad: linear-gradient(135deg,#f093fb,#f5576c);cursor:pointer;" onclick="openSpentDetailModal()">
         <span class="metric-icon">💸</span>
         <div class="metric-label">${t('metric_spent')}</div>
         <div class="metric-value">${formatYen(spent)}</div>
@@ -579,7 +577,7 @@ function renderDashboard() {
           ${spentSign} ${formatYen(Math.abs(spentDiff))} ${t('metric_spent_vs')}
         </div>
       </div>
-      <div class="metric-card" style="--grad: linear-gradient(135deg,#11998e,#38ef7d);">
+      <div class="metric-card" style="--grad: linear-gradient(135deg,#11998e,#38ef7d);cursor:pointer;" onclick="openSavingsDetailModal()">
         <span class="metric-icon">🏦</span>
         <div class="metric-label">${t('metric_savings')}</div>
         <div class="metric-value">${formatYen(savings)}</div>
@@ -749,6 +747,315 @@ function openAllTimeSavingsModal() {
       </div>
     </div>
   `;
+}
+
+/* ── 9a-2. METRIC CARD DETAIL MODALS (Income / Spent / Savings) ── */
+function openIncomeDetailModal() {
+  const monthKey = dashboardSelectedMonth || currentYYYYMM();
+  const monthIncome = incomeForMonth(monthKey);
+  const months = monthRangeToNow(firstDataMonthKey()).slice(-6);
+
+  const rows = months.map(k => {
+    const inc = incomeForMonth(k);
+    return `<tr><td>${monthKeyLabel(k)}</td><td>${formatYen(inc)}</td></tr>`;
+  }).join('');
+
+  const overlay = document.getElementById('edit-modal');
+  overlay.classList.add('open');
+  overlay.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">${t('metric_income_modal_title')}</div>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">
+        ${t('metric_income_modal_desc', { month: monthKeyLabel(monthKey) })}
+      </div>
+      <div style="text-align:center;padding:10px 0 18px;">
+        <div style="font-size:32px;font-weight:800;color:#a78bfa;">${formatYen(monthIncome)}</div>
+        ${monthIncome ? '' : `<div style="font-size:12px;color:var(--text-muted);margin-top:6px;">${t('no_income_set')}</div>`}
+      </div>
+      <div class="modal-body-scroll">
+        <table class="md-table">
+          <thead><tr><th>${t('th_month')}</th><th>${t('th_income')}</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function openSpentDetailModal() {
+  const monthKey = dashboardSelectedMonth || currentYYYYMM();
+  const cur = expensesForMonthKey(monthKey);
+  const catMap = groupByCategory(cur);
+  const spent = totalSpent(cur);
+
+  const rows = CATEGORIES.filter(c => catMap[c.id] > 0).map(c => {
+    const val = catMap[c.id] || 0;
+    const pct = Math.round((val / (spent || 1)) * 100);
+    return `<tr><td>${c.emoji} ${catLabel(c.id)}</td><td>${formatYen(val)}</td><td>${pct}%</td></tr>`;
+  }).join('');
+
+  const overlay = document.getElementById('edit-modal');
+  overlay.classList.add('open');
+  overlay.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">${t('metric_spent_modal_title')}</div>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">
+        ${t('metric_spent_modal_desc', { month: monthKeyLabel(monthKey) })}
+      </div>
+      <div style="text-align:center;padding:10px 0 18px;">
+        <div style="font-size:32px;font-weight:800;color:#f5576c;">${formatYen(spent)}</div>
+      </div>
+      <div class="modal-body-scroll">
+        <table class="md-table">
+          <thead><tr><th>${t('th_category')}</th><th>${t('th_amount')}</th><th>${t('th_pct')}</th></tr></thead>
+          <tbody>${rows || `<tr><td colspan="3" style="text-align:center;color:var(--text-muted);">${t('no_data_month')}</td></tr>`}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function openSavingsDetailModal() {
+  const monthKey = dashboardSelectedMonth || currentYYYYMM();
+  const monthIncome = incomeForMonth(monthKey);
+  const cur = expensesForMonthKey(monthKey);
+  const spent = totalSpent(cur);
+  const savings = Math.max(0, monthIncome - spent);
+  const pct = Math.round((savings / (monthIncome || 1)) * 100);
+
+  const overlay = document.getElementById('edit-modal');
+  overlay.classList.add('open');
+  overlay.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">${t('metric_savings_modal_title')}</div>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">
+        ${t('metric_savings_modal_desc', { month: monthKeyLabel(monthKey) })}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;padding:6px 0 4px;">
+        <div style="display:flex;justify-content:space-between;font-size:14px;">
+          <span style="color:var(--text-secondary);">${t('savings_calc_income')}</span>
+          <span style="font-weight:700;color:#68d391;">${formatYen(monthIncome)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:14px;">
+          <span style="color:var(--text-secondary);">${t('savings_calc_spent')}</span>
+          <span style="font-weight:700;color:#fc8181;">- ${formatYen(spent)}</span>
+        </div>
+        <div style="border-top:1px solid var(--border);padding-top:10px;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:14px;color:var(--text-secondary);">${t('savings_calc_result')}</span>
+          <span style="font-size:20px;font-weight:800;color:#38ef7d;">${formatYen(savings)}</span>
+        </div>
+        <div style="text-align:center;font-size:12px;color:var(--text-secondary);margin-top:2px;">${t('metric_savings_pct', { pct })}</div>
+      </div>
+    </div>
+  `;
+}
+
+/* ── 9a-3. ACCOUNT SETTINGS (username / password / avatar) ── */
+function getInitials(name) {
+  const parts = (name || 'User').trim().split(' ').filter(Boolean);
+  return parts.length >= 2
+    ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    : (name || 'User').slice(0, 2).toUpperCase();
+}
+
+function resizeImageToDataUrl(file, size) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const minSide = Math.min(img.width, img.height);
+        const sx = (img.width - minSide) / 2;
+        const sy = (img.height - minSide) / 2;
+        ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, size, size);
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = () => reject(new Error('Could not read that image'));
+      img.src = reader.result;
+    };
+    reader.onerror = () => reject(new Error('Could not read that file'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function openAccountSettingsModal() {
+  const overlay = document.getElementById('edit-modal');
+  overlay.classList.add('open');
+  overlay.innerHTML = `
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <div class="modal-title">${t('settings_account_title')}</div>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body-scroll">
+
+        <div class="settings-section-title">${t('settings_photo')}</div>
+        <div class="avatar-uploader">
+          <div class="avatar-uploader-preview" id="avatar-preview">
+            ${currentUser.avatar ? `<img src="${currentUser.avatar}" alt="" />` : getInitials(currentUser.name)}
+          </div>
+          <div class="avatar-uploader-actions">
+            <input type="file" id="avatar-file-input" accept="image/*" style="display:none;" onchange="handleAvatarFileSelected(this)" />
+            <button type="button" class="btn-secondary" onclick="document.getElementById('avatar-file-input').click()">📷 ${t('settings_change_photo')}</button>
+            ${currentUser.avatar ? `<button type="button" id="remove-avatar-btn" class="btn-text-danger" onclick="removeAvatar()">${t('settings_remove_photo')}</button>` : ''}
+          </div>
+        </div>
+
+        <div class="settings-section-title">${t('settings_username')}</div>
+        <div class="form-group">
+          <label class="form-label">${t('full_name_label')}</label>
+          <input class="form-input" id="settings-name-input" type="text" value="${escHTML(currentUser.name || '')}" />
+        </div>
+        <button type="button" class="btn-primary" style="margin-top:10px;width:auto;padding:8px 18px;font-size:13px;" onclick="saveProfileName()">${t('settings_save_name')}</button>
+
+        <div class="settings-section-title">${t('settings_change_password')}</div>
+        <div class="form-grid">
+          <div class="form-group full">
+            <label class="form-label">${t('current_password_label')}</label>
+            <input class="form-input" id="settings-current-password" type="password" autocomplete="current-password" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">${t('new_password_label')}</label>
+            <input class="form-input" id="settings-new-password" type="password" minlength="6" autocomplete="new-password" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">${t('confirm_new_password_label')}</label>
+            <input class="form-input" id="settings-confirm-password" type="password" autocomplete="new-password" />
+          </div>
+        </div>
+        <div id="settings-password-error" class="auth-error" style="display:none;margin-top:10px;"></div>
+        <div id="settings-password-success" class="auth-success" style="display:none;margin-top:10px;"></div>
+        <button type="button" class="btn-primary" style="margin-top:10px;width:auto;padding:8px 18px;font-size:13px;" onclick="changeUserPassword()">${t('settings_save_password')}</button>
+
+      </div>
+    </div>
+  `;
+}
+
+async function handleAvatarFileSelected(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    showToast(t('toast_invalid_image'), true);
+    input.value = '';
+    return;
+  }
+
+  try {
+    const dataUrl = await resizeImageToDataUrl(file, 240);
+    const res = await apiRequest('update_profile', { name: currentUser.name, avatar: dataUrl });
+    currentUser = res.user || currentUser;
+    updateSidebarUser();
+
+    const preview = document.getElementById('avatar-preview');
+    if (preview) preview.innerHTML = `<img src="${currentUser.avatar}" alt="" />`;
+
+    const actions = document.querySelector('.avatar-uploader-actions');
+    if (actions && !document.getElementById('remove-avatar-btn')) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.id = 'remove-avatar-btn';
+      btn.className = 'btn-text-danger';
+      btn.textContent = t('settings_remove_photo');
+      btn.onclick = removeAvatar;
+      actions.appendChild(btn);
+    }
+    showToast(t('toast_photo_updated'));
+  } catch (err) {
+    showToast(err.message || t('toast_photo_update_failed'), true);
+  } finally {
+    input.value = '';
+  }
+}
+
+async function removeAvatar() {
+  try {
+    const res = await apiRequest('update_profile', { name: currentUser.name, avatar: null });
+    currentUser = res.user || currentUser;
+    updateSidebarUser();
+
+    const preview = document.getElementById('avatar-preview');
+    if (preview) preview.innerHTML = getInitials(currentUser.name);
+    const removeBtn = document.getElementById('remove-avatar-btn');
+    if (removeBtn) removeBtn.remove();
+
+    showToast(t('toast_photo_removed'));
+  } catch (err) {
+    showToast(err.message || t('toast_photo_update_failed'), true);
+  }
+}
+
+async function saveProfileName() {
+  const nameInput = document.getElementById('settings-name-input');
+  const name = nameInput ? nameInput.value.trim() : '';
+  if (!name) {
+    showToast(t('toast_name_required'), true);
+    return;
+  }
+  try {
+    const res = await apiRequest('update_profile', { name });
+    currentUser = res.user || currentUser;
+    updateSidebarUser();
+    showToast(t('toast_profile_updated'));
+  } catch (err) {
+    showToast(err.message || t('toast_profile_update_failed'), true);
+  }
+}
+
+async function changeUserPassword() {
+  const curEl     = document.getElementById('settings-current-password');
+  const newEl     = document.getElementById('settings-new-password');
+  const confirmEl = document.getElementById('settings-confirm-password');
+  const errEl     = document.getElementById('settings-password-error');
+  const sucEl     = document.getElementById('settings-password-success');
+
+  errEl.style.display = 'none';
+  sucEl.style.display = 'none';
+
+  const current = curEl.value;
+  const next    = newEl.value;
+  const confirm = confirmEl.value;
+
+  if (!current || !next) {
+    errEl.textContent = t('err_all_fields');
+    errEl.style.display = 'block';
+    return;
+  }
+  if (next.length < 6) {
+    errEl.textContent = t('err_password_too_short');
+    errEl.style.display = 'block';
+    return;
+  }
+  if (next !== confirm) {
+    errEl.textContent = t('err_password_mismatch');
+    errEl.style.display = 'block';
+    return;
+  }
+
+  try {
+    await apiRequest('change_password', { currentPassword: current, newPassword: next });
+    sucEl.textContent = t('toast_password_changed');
+    sucEl.style.display = 'block';
+    curEl.value = '';
+    newEl.value = '';
+    confirmEl.value = '';
+  } catch (err) {
+    errEl.textContent = '❌ ' + (err.message || 'Failed');
+    errEl.style.display = 'block';
+  }
 }
 
 /* ── 9b. ADD EXPENSE ── */
@@ -1035,6 +1342,49 @@ function exportExpensesToExcel() {
   XLSX.writeFile(wb, `neopocket-expenses-${today}.xlsx`);
 }
 
+function exportExpensesToPDF() {
+  if (!expenses.length) {
+    alert(t('no_export_alert'));
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const sorted = [...expenses].sort((a, b) => txSortKey(b) - txSortKey(a));
+  const rows = sorted.map(e => [
+    e.date,
+    formatTime(e.time) || '-',
+    e.name,
+    CAT_MAP[e.cat] ? catLabel(e.cat) : e.cat,
+    formatYen(e.amount),
+    e.note || ''
+  ]);
+  const total = sorted.reduce((sum, e) => sum + e.amount, 0);
+
+  doc.setFontSize(16);
+  doc.setTextColor(30);
+  doc.text('NEOPOCKET AI', 14, 18);
+  doc.setFontSize(10);
+  doc.setTextColor(120);
+  doc.text(`${t('all_transactions')} — ${today}`, 14, 25);
+
+  doc.autoTable({
+    startY: 32,
+    head: [[t('date_label'), t('time_label'), t('expense_name'), t('category_label'), t('amount_label'), t('note_label')]],
+    body: rows,
+    styles: { fontSize: 8, cellPadding: 3 },
+    headStyles: { fillColor: [102, 126, 234], textColor: 255 },
+    foot: [['', '', '', '', formatYen(total), 'TOTAL']],
+    footStyles: { fillColor: [240, 240, 240], textColor: 30, fontStyle: 'bold' },
+    columnStyles: { 4: { halign: 'right' } },
+    margin: { left: 14, right: 14 },
+  });
+
+  doc.save(`neopocket-expenses-${today}.pdf`);
+}
+
 function renderAnalytics() {
   if (!analyticsSelectedMonth) analyticsSelectedMonth = currentYYYYMM();
 
@@ -1071,6 +1421,7 @@ function renderAnalytics() {
           ${monthPickerOptions().map(o => `<option value="${o.value}" ${o.value === analyticsSelectedMonth ? 'selected' : ''}>${o.label}</option>`).join('')}
         </select>
         <button onclick="exportExpensesToExcel()" class="login-btn" style="width:auto;padding:8px 16px;font-size:13px;">${t('export_excel_btn')}</button>
+        <button onclick="exportExpensesToPDF()" class="btn-secondary" style="width:auto;padding:8px 16px;font-size:13px;">${t('export_pdf_btn')}</button>
       </div>
     </div>
 
